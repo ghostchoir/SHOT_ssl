@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import random
 from PIL import Image
+from torchvision import datasets
 from torch.utils.data import Dataset
 import os
 import os.path
@@ -31,6 +32,18 @@ def l_loader(path):
         with Image.open(f) as img:
             return img.convert('L')
 
+class CIFAR10_idx(datasets.CIFAR10):
+    def __getitem__(self, index):
+        sample = self.data[index]
+        sample = Image.fromarray(sample)
+        target = self.targets[index]
+        if self.transform is not None:
+            sample = self.transform(sample)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+    
+        return sample, target, index
+        
 class ImageList(Dataset):
     def __init__(self, image_list, labels=None, transform=None, target_transform=None, mode='RGB'):
         imgs = make_dataset(image_list, labels)

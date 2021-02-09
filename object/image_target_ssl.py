@@ -9,7 +9,7 @@ import torch.optim as optim
 from torchvision import transforms, datasets
 import network, loss
 from torch.utils.data import DataLoader
-from data_list import ImageList, ImageList_idx
+from data_list import ImageList, ImageList_idx, CIFAR10_idx
 from data import *
 from loss import NTXentLoss
 import random, pdb, math, copy
@@ -36,33 +36,42 @@ def data_load(args):
     dsets = {}
     dset_loaders = {}
     train_bs = args.batch_size
-    txt_tar = open(args.t_dset_path).readlines()
-    txt_test = open(args.test_dset_path).readlines()
-
-    if not args.da == 'uda':
-        label_map_s = {}
-        for i in range(len(args.src_classes)):
-            label_map_s[args.src_classes[i]] = i
-
-        new_tar = []
-        for i in range(len(txt_tar)):
-            rec = txt_tar[i]
-            reci = rec.strip().split(' ')
-            if int(reci[1]) in args.tar_classes:
-                if int(reci[1]) in args.src_classes:
-                    line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'   
-                    new_tar.append(line)
-                else:
-                    line = reci[0] + ' ' + str(len(label_map_s)) + '\n'   
-                    new_tar.append(line)
-        txt_tar = new_tar.copy()
-        txt_test = txt_tar.copy()
-
+    
+    if args.dset == 'CIFAR-10-C':
+        dsets["target"] = cifar10c_dset_idx(args)
+        dsets["target"].transform = cifar_train(args)
+        dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=False if args.ssl_task == 'none' else True)
         
-    dsets["target"] = ImageList_idx(txt_tar, transform=image_train(args))
-    dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=True)
-    dsets["test"] = ImageList_idx(txt_test, transform=image_test())
-    dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
+        dsets["test"] = cifar10c_dset_idx(args)
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
+    else:
+        txt_tar = open(args.t_dset_path).readlines()
+        txt_test = open(args.test_dset_path).readlines()
+    
+        if not args.da == 'uda':
+            label_map_s = {}
+            for i in range(len(args.src_classes)):
+                label_map_s[args.src_classes[i]] = i
+    
+            new_tar = []
+            for i in range(len(txt_tar)):
+                rec = txt_tar[i]
+                reci = rec.strip().split(' ')
+                if int(reci[1]) in args.tar_classes:
+                    if int(reci[1]) in args.src_classes:
+                        line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'   
+                        new_tar.append(line)
+                    else:
+                        line = reci[0] + ' ' + str(len(label_map_s)) + '\n'   
+                        new_tar.append(line)
+            txt_tar = new_tar.copy()
+            txt_test = txt_tar.copy()
+    
+            
+        dsets["target"] = ImageList_idx(txt_tar, transform=image_train(args))
+        dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=True)
+        dsets["test"] = ImageList_idx(txt_test, transform=image_test())
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
 
     return dset_loaders
 
@@ -241,7 +250,7 @@ def train_target(args):
             netF.eval()
             netH.eval()
             netB.eval()
-            if args.dset=='visda-c':
+            if args.dset in ['visda-c', 'CIFAR-10-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter, acc_s_te) + '\n' + acc_list
             else:

@@ -49,23 +49,23 @@ def data_load(args):
             dsets["source_tr"] = datasets.CIFAR10(root=args.folder+'CIFAR-10-C',
                                                   train=True,
                                                   download=False,
-                                                  transform=cifar_train()
+                                                  transform=cifar_train(args)
                                                  )
         except:
             dsets["source_tr"] = datasets.CIFAR10(root=args.folder+'CIFAR-10-C',
                                                   train=True,
                                                   download=True,
-                                                  transform=cifar_train()
+                                                  transform=cifar_train(args)
                                                  )
         dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=True)
         dsets["source_te"] = datasets.CIFAR10(root=args.folder+'CIFAR-10-C',
                                               train=False,
                                               download=False,
-                                              transform=cifar_train()
+                                              transform=cifar_test()
                                              )
-        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=False)
+        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
         dsets["test"] = cifar10c_dset(args)
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=True, num_workers=args.worker, drop_last=False)
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
     
     else:
         txt_src = open(args.s_dset_path).readlines()
@@ -110,11 +110,11 @@ def data_load(args):
             tr_txt = txt_src
             
         dsets["source_tr"] = ImageList(tr_txt, transform=image_train(args))
-        dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=True)
+        dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=False if args.ssl_task=='none' else True)
         dsets["source_te"] = ImageList(te_txt, transform=image_test())
-        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=False)
+        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs, shuffle=False, num_workers=args.worker, drop_last=False)
         dsets["test"] = ImageList(txt_test, transform=image_test())
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=True, num_workers=args.worker, drop_last=False)
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
 
     return dset_loaders
 
@@ -387,7 +387,7 @@ def test_target(args):
         acc_os1, acc_os2, acc_unknown = cal_acc_oda(dset_loaders['test'], netF, netH, netB, netC)
         log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}% / {:.2f}% / {:.2f}%'.format(args.trte, args.name, acc_os2, acc_os1, acc_unknown)
     else:
-        if args.dset=='visda-c':
+        if args.dset in ['visda-c', 'CIFAR-10-C']:
             acc, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
             log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}%'.format(args.trte, args.name, acc) + '\n' + acc_list
         else:
@@ -412,7 +412,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_epoch', type=int, default=20, help="max iterations")
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
     parser.add_argument('--worker', type=int, default=8, help="number of workers")
-    parser.add_argument('--dset', type=str, default='office-home', choices=['visda-c', 'office', 'office-home', 'office-caltech'])
+    parser.add_argument('--dset', type=str, default='office-home', choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C'])
     parser.add_argument('--level', type=int, default=5)
     parser.add_argument('--folder', type=str, default='/SSD/euntae/data/')
     parser.add_argument('--lr', type=float, default=1e-2, help="learning rate")

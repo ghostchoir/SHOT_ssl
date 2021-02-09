@@ -2,6 +2,7 @@ from torchvision import transforms, datasets
 import numpy as np
 import cv2
 cv2.setNumThreads(0)
+from data_list import CIFAR10_idx
 
 
 corruptions = ['gaussian_noise', 'shot_noise', 'impulse_noise', 'defocus_blur', 'glass_blur',
@@ -51,18 +52,17 @@ class GaussianBlur(object):
 def cifar_train(args):
     normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
     
-    if args.hardaug:
-        if args.ssl_task == 'simclr':
-            s = args.aug_strength
-            color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
-            trfs = [
-                transforms.RandomResizedCrop(size=(32, 32)),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomApply([color_jitter], p=0.8),
-                transforms.RandomGrayscale(p=0.2),
-                #GaussianBlur(kernel_size=int(0.1 * crop_size)),
-                transforms.ToTensor(),
-            ]
+    if args.aug_type == 'simclr':
+        s = args.aug_strength
+        color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
+        trfs = [
+            transforms.RandomResizedCrop(size=(32, 32)),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomApply([color_jitter], p=0.8),
+            transforms.RandomGrayscale(p=0.2),
+            #GaussianBlur(kernel_size=int(0.1 * crop_size)),
+            transforms.ToTensor(),
+        ]
     else:
         trfs = [
             transforms.RandomCrop(32, padding=4),
@@ -102,28 +102,21 @@ def cifar10c_dset(args):
     
     return dset
 
-
-def simclr_train(resize_size=256, crop_size=224, args):
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                   std=[0.229, 0.224, 0.225])
+def cifar10c_dset_idx(args):
     
-    s = args.aug_strength
-    color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
+    dset = CIFAR10_idx(root=args.folder+'CIFAR-10-C',
+                            train=False,
+                            download=False,
+                            transform=cifar_test()
+                           )
     
-    trfs = [
-        transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomApply([color_jitter], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
-        #GaussianBlur(kernel_size=int(0.1 * crop_size)),
-        transforms.ToTensor(),
-    ]
+    tsize = 10000
+    tset_raw = np.load(args.folder + 'CIFAR-10-C/%s.npy' %(corruptions[args.t]))
+    tset_raw = tset_raw[(args.level-1)*tsize: args.level*tsize]
     
-    if args.norm_img:
-        trfs.append(normalize)
-        
-    return DuplicatedCompose(trfs)
-
+    dset.data = tset_raw
+    
+    return dset
 
 def image_train(args, resize_size=256, crop_size=224, alexnet=False):
     if not alexnet:
@@ -132,18 +125,17 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
     else:
         normalize = Normalize(meanfile='./ilsvrc_2012_mean.npy')
         
-    if args.hardaug:
-        if args.ssl_task == 'simclr':
-            s = args.aug_strength
-            color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
-            trfs = [
-                transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0)),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomApply([color_jitter], p=0.8),
-                transforms.RandomGrayscale(p=0.2),
-                GaussianBlur(kernel_size=int(0.1 * crop_size)),
-                transforms.ToTensor(),
-            ]
+    if args.aug_type == 'simclr':
+        s = args.aug_strength
+        color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
+        trfs = [
+            transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0)),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomApply([color_jitter], p=0.8),
+            transforms.RandomGrayscale(p=0.2),
+            GaussianBlur(kernel_size=int(0.1 * crop_size)),
+            transforms.ToTensor(),
+        ]
     else:
         trfs = [
             transforms.Resize((resize_size, resize_size)),
@@ -162,14 +154,14 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
 
 
 def image_test(resize_size=256, crop_size=224, alexnet=False):
-  if not alexnet:
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                   std=[0.229, 0.224, 0.225])
-  else:
-    normalize = Normalize(meanfile='./ilsvrc_2012_mean.npy')
-  return  transforms.Compose([
+    if not alexnet:
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    else:
+        normalize = Normalize(meanfile='./ilsvrc_2012_mean.npy')
+    return  transforms.Compose([
         transforms.Resize((resize_size, resize_size)),
         transforms.CenterCrop(crop_size),
         transforms.ToTensor(),
         normalize
-    ])
+      ])
