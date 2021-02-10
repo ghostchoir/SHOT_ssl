@@ -385,7 +385,7 @@ if __name__ == "__main__":
     parser.add_argument('--issave', type=bool, default=True)
     
     parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr'])
-    parser.add_argument('--ssl_weight', type=float, default=1.0)
+    parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_after_btn', type=bool, default=True)
     parser.add_argument('--norm_img', type=bool, default=True)
@@ -394,6 +394,9 @@ if __name__ == "__main__":
     
     parser.add_argument('--aug_type', type=str, default='simclr')
     parser.add_argument('--aug_strength', type=float, default=1.0)
+    parser.add_argument('--jitter', type=bool, default=True)
+    parser.add_argument('--grayscale', type=bool, default=True)
+    parser.add_argument('--gaussblur', type=bool, default=True)
     args = parser.parse_args()
 
     if args.dset == 'office-home':

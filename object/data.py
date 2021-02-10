@@ -58,11 +58,15 @@ def cifar_train(args):
         trfs = [
             transforms.RandomResizedCrop(size=(32, 32)),
             transforms.RandomHorizontalFlip(),
-            transforms.RandomApply([color_jitter], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
-            #GaussianBlur(kernel_size=int(0.1 * crop_size)),
-            transforms.ToTensor(),
         ]
+        if args.jitter:
+            trfs.append(transforms.RandomApply([color_jitter], p=0.8))
+        if args.grayscale:
+            trfs.append(transforms.RandomGrayscale(p=0.2))
+        if args.gaussblur:
+            trfs.append(GaussianBlur(kernel_size=int(0.1 * crop_size)))
+            
+        trfs.append(transforms.ToTensor())
     else:
         trfs = [
             transforms.RandomCrop(32, padding=4),
