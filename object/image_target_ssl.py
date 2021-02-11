@@ -85,7 +85,10 @@ def cal_acc(loader, netF, netH, netB, netC, flag=False):
             inputs = data[0]
             labels = data[1]
             inputs = inputs.cuda()
-            outputs = netC(netB(netF(inputs)))
+            if args.bottleneck != 0:
+                outputs = netC(netB(netF(inputs)))
+            else:
+                outputs = netC(netF(inputs))
             if start_test:
                 all_output = outputs.float().cpu()
                 all_label = labels.float()
@@ -123,15 +126,17 @@ def train_target(args):
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     else:
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
-    netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck)
+    if args.bottleneck != 0:
+        netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck)
     netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
     
     modelpath = args.output_dir_src + '/source_F.pt'   
     netF.load_state_dict(torch.load(modelpath))
     modelpath = args.output_dir_src + '/source_H.pt'   
     netH.load_state_dict(torch.load(modelpath))
-    modelpath = args.output_dir_src + '/source_B.pt'   
-    netB.load_state_dict(torch.load(modelpath))
+    if args.bottleneck != 0:
+        modelpath = args.output_dir_src + '/source_B.pt'   
+        netB.load_state_dict(torch.load(modelpath))
     modelpath = args.output_dir_src + '/source_C.pt'    
     netC.load_state_dict(torch.load(modelpath))
     netC.eval()
@@ -141,12 +146,14 @@ def train_target(args):
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
         netH = nn.DataParallel(netH).cuda()
-        netB = nn.DataParallel(netB).cuda()
+        if args.bottleneck != 0:
+            netB = nn.DataParallel(netB).cuda()
         netC = nn.DataParallel(netC).cuda()
     else:
         netF.cuda()
         netH.cuda()
-        netB.cuda()
+        if args.bottleneck != 0:
+            netB.cuda()
         netC.cuda()
 
     param_group = []
@@ -155,11 +162,12 @@ def train_target(args):
             param_group += [{'params': v, 'lr': args.lr * args.lr_decay1}]
         else:
             v.requires_grad = False
-    for k, v in netB.named_parameters():
-        if args.lr_decay2 > 0:
-            param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
-        else:
-            v.requires_grad = False
+    if args.bottleneck != 0:
+        for k, v in netB.named_parameters():
+            if args.lr_decay2 > 0:
+                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
+            else:
+                v.requires_grad = False
     for k, v in netH.named_parameters():
         if args.lr_decay2 > 0:
             param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]   
@@ -193,32 +201,40 @@ def train_target(args):
         if iter_num % interval_iter == 0 and args.cls_par > 0:
             netF.eval()
             netH.eval()
-            netB.eval()
+            if args.bottleneck != 0:
+                netB.eval()
             mem_label = obtain_label(dset_loaders['test'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
             netF.train()
             netH.train()
-            netB.train()
+            if args.bottleneck != 0:
+                netB.train()
 
         inputs_test1, inputs_test2 = inputs_test[0].cuda(), inputs_test[1].cuda()
 
         iter_num += 1
         lr_scheduler(optimizer, iter_num=iter_num, max_iter=max_iter)
 
-        
-        if args.ssl_after_btn:
-            f1, f2 = netB(netF(inputs_test1)), netB(netF(inputs_test2))
-            
-            z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-            
-            outputs_test = netC(f1)
-            
+        if args.bottleneck != 0:
+            if args.ssl_after_btn:
+                f1, f2 = netB(netF(inputs_test1)), netB(netF(inputs_test2))
+                
+                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+                
+                outputs_test = netC(f1)
+                
+            else:
+                f1, f2 = netF(inputs_test1), netF(inputs_test2)
+                
+                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+                
+                outputs_test = netC(netB(f1))
         else:
             f1, f2 = netF(inputs_test1), netF(inputs_test2)
-            
+                
             z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-            
-            outputs_test = netC(netB(f1))
+                
+            outputs_test = netC(f1)
 
         if args.cls_par > 0:
             pred = mem_label[tar_idx]
@@ -249,7 +265,8 @@ def train_target(args):
         if iter_num % interval_iter == 0 or iter_num == max_iter:
             netF.eval()
             netH.eval()
-            netB.eval()
+            if args.bottleneck != 0:
+                netB.eval()
             if args.dset in ['visda-c', 'CIFAR-10-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter, acc_s_te) + '\n' + acc_list
@@ -262,18 +279,21 @@ def train_target(args):
             print(log_str+'\n')
             netF.train()
             netH.train()
-            netB.train()
+            if args.bottleneck != 0:
+                netB.train()
 
     if args.issave:
         if args.dataparallel:
             torch.save(netF.module.state_dict(), osp.join(args.output_dir, "target_F_" + args.savename + ".pt"))
             torch.save(netH.module.state_dict(), osp.join(args.output_dir, "target_H_" + args.savename + ".pt"))
-            torch.save(netB.module.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
+            if args.bottleneck != 0:
+                torch.save(netB.module.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
             torch.save(netC.module.state_dict(), osp.join(args.output_dir, "target_C_" + args.savename + ".pt"))
         else:
             torch.save(netF.state_dict(), osp.join(args.output_dir, "target_F_" + args.savename + ".pt"))
             torch.save(netH.state_dict(), osp.join(args.output_dir, "target_H_" + args.savename + ".pt"))
-            torch.save(netB.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
+            if args.bottleneck != 0:
+                torch.save(netB.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
             torch.save(netC.state_dict(), osp.join(args.output_dir, "target_C_" + args.savename + ".pt"))
         
     return netF, netH, netB, netC
@@ -294,7 +314,10 @@ def obtain_label(loader, netF, netH, netB, netC, args):
             inputs = data[0]
             labels = data[1]
             inputs = inputs.cuda()
-            feas = netB(netF(inputs))
+            if args.bottleneck != 0:
+                feas = netB(netF(inputs))
+            else:
+                feas = netF(inputs)
             outputs = netC(feas)
             if start_test:
                 all_fea = feas.float().cpu()
