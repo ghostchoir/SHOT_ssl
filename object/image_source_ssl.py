@@ -391,7 +391,7 @@ def test_target(args):
             acc, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
             log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}%'.format(args.trte, args.name, acc) + '\n' + acc_list
         else:
-            acc, _ = cal_acc(dset_loaders['test'], netF, netB, netC, False)
+            acc, _ = cal_acc(dset_loaders['test'], netF, netH, netB, netC, False)
             log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}%'.format(args.trte, args.name, acc)
 
     args.out_file.write(log_str)
