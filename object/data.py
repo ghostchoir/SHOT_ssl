@@ -64,7 +64,7 @@ def cifar_train(args):
         if args.grayscale:
             trfs.append(transforms.RandomGrayscale(p=0.2))
         if args.gaussblur:
-            trfs.append(GaussianBlur(kernel_size=int(0.1 * crop_size)))
+            trfs.append(GaussianBlur(kernel_size=int(0.1 * 32)))
             
         trfs.append(transforms.ToTensor())
     else:
