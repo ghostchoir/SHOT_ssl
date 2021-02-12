@@ -537,7 +537,7 @@ if __name__ == "__main__":
             args.src_classes = [i for i in range(25)]
             args.tar_classes = [i for i in range(65)]
 
-    if args.dset == 'CIFAR-10-C':
+    if args.dset in ['CIFAR-10-C', 'CIFAR-100-C']:
         args.output_dir_src = osp.join(args.output, args.da, args.dset, 'source')
         args.name_src = 'source'
     else:
