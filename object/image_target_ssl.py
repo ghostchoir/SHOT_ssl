@@ -81,7 +81,6 @@ def cal_acc(loader, netF, netH, netB, netC, flag=False):
         iter_test = iter(loader)
         for i in range(len(loader)):
             data = iter_test.next()
-            
             inputs = data[0]
             labels = data[1]
             inputs = inputs.cuda()
@@ -122,13 +121,16 @@ def train_target(args):
     elif args.net[0:3] == 'vgg':
         netF = network.VGGBase(vgg_name=args.net)
     
-    if args.ssl_after_btn:
-        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
-    else:
+    #print(args.ssl_before_btn)
+    if args.ssl_before_btn:
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
+    else:
+        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck)
-    netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
+    else:
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features)
     
     modelpath = args.output_dir_src + '/source_F.pt'   
     netF.load_state_dict(torch.load(modelpath))
@@ -216,19 +218,19 @@ def train_target(args):
         lr_scheduler(optimizer, iter_num=iter_num, max_iter=max_iter)
 
         if args.bottleneck != 0:
-            if args.ssl_after_btn:
-                f1, f2 = netB(netF(inputs_test1)), netB(netF(inputs_test2))
-                
-                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-                
-                outputs_test = netC(f1)
-                
-            else:
+            if args.ssl_before_btn:
                 f1, f2 = netF(inputs_test1), netF(inputs_test2)
                 
                 z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
                 
                 outputs_test = netC(netB(f1))
+                
+            else:
+                f1, f2 = netB(netF(inputs_test1)), netB(netF(inputs_test2))
+                
+                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+                
+                outputs_test = netC(f1)
         else:
             f1, f2 = netF(inputs_test1), netF(inputs_test2)
                 
@@ -410,7 +412,7 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr'])
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
-    parser.add_argument('--ssl_after_btn', type=bool, default=True)
+    parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--norm_img', type=bool, default=True)
     parser.add_argument('--norm_feat', type=bool, default=True)
     parser.add_argument('--embedding_dim', type=int, default=128)
@@ -420,6 +422,8 @@ if __name__ == "__main__":
     parser.add_argument('--jitter', type=bool, default=True)
     parser.add_argument('--grayscale', type=bool, default=True)
     parser.add_argument('--gaussblur', type=bool, default=True)
+    
+    parser.add_argument('--noisy_pl', type=bool, default=False)
     args = parser.parse_args()
 
     if args.dset == 'office-home':

@@ -214,13 +214,15 @@ def train_source(args):
     elif args.net[0:3] == 'vgg':
         netF = network.VGGBase(vgg_name=args.net)
     
-    if args.ssl_after_btn:
-        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
-    else:
+    if args.ssl_before_btn:
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
+    else:
+        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck)
-    netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
+    else:
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features)
     
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
@@ -283,20 +285,19 @@ def train_source(args):
 
         inputs_source1, inputs_source2, labels_source = inputs_source[0].cuda(), inputs_source[1].cuda(), labels_source.cuda()
         if args.bottleneck != 0:
-            if args.ssl_after_btn:
-                f1, f2 = netB(netF(inputs_source1)), netB(netF(inputs_source2))
-                
-                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-                
-                outputs_source = netC(f1)
-                
-            else:
-                
+            if args.ssl_before_btn:
                 f1, f2 = netF(inputs_source1), netF(inputs_source2)
             
                 z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
             
                 outputs_source = netC(netB(f1))
+                
+            else:
+                f1, f2 = netB(netF(inputs_source1)), netB(netF(inputs_source2))
+                
+                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+                
+                outputs_source = netC(f1)
         else:
             f1, f2 = netF(inputs_source1), netF(inputs_source2)
             z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
@@ -370,13 +371,15 @@ def test_target(args):
     elif args.net[0:3] == 'vgg':
         netF = network.VGGBase(vgg_name=args.net)
     
-    if args.ssl_after_btn:
-        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
-    else:
+    if args.ssl_before_btn:
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
+    else:
+        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck)
-    netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
+    else:
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features)
     
     
     args.modelpath = args.output_dir_src + '/source_F.pt'   
@@ -455,7 +458,7 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr'])
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
-    parser.add_argument('--ssl_after_btn', type=bool, default=True)
+    parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--norm_img', type=bool, default=True)
     parser.add_argument('--norm_feat', type=bool, default=True)
     parser.add_argument('--embedding_dim', type=int, default=128)
