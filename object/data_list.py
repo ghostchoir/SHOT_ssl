@@ -43,6 +43,18 @@ class CIFAR10_idx(datasets.CIFAR10):
             target = self.target_transform(target)
     
         return sample, target, index
+    
+class CIFAR100_idx(datasets.CIFAR100):
+    def __getitem__(self, index):
+        sample = self.data[index]
+        sample = Image.fromarray(sample)
+        target = self.targets[index]
+        if self.transform is not None:
+            sample = self.transform(sample)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+    
+        return sample, target, index
         
 class ImageList(Dataset):
     def __init__(self, image_list, labels=None, transform=None, target_transform=None, mode='RGB'):

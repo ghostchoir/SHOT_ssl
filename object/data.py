@@ -2,7 +2,7 @@ from torchvision import transforms, datasets
 import numpy as np
 import cv2
 cv2.setNumThreads(0)
-from data_list import CIFAR10_idx
+from data_list import CIFAR10_idx, CIFAR100_idx
 
 
 corruptions = ['gaussian_noise', 'shot_noise', 'impulse_noise', 'defocus_blur', 'glass_blur',
