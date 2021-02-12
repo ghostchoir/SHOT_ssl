@@ -122,6 +122,38 @@ def cifar10c_dset_idx(args):
     
     return dset
 
+def cifar100c_dset(args):
+    
+    dset = datasets.CIFAR100(root=args.folder+'CIFAR-100-C',
+                            train=False,
+                            download=False,
+                            transform=cifar_test()
+                           )
+    
+    tsize = 10000
+    tset_raw = np.load(args.folder + 'CIFAR-100-C/%s.npy' %(corruptions[args.t]))
+    tset_raw = tset_raw[(args.level-1)*tsize: args.level*tsize]
+    
+    dset.data = tset_raw
+    
+    return dset
+
+def cifar100c_dset_idx(args):
+    
+    dset = CIFAR100_idx(root=args.folder+'CIFAR-100-C',
+                            train=False,
+                            download=False,
+                            transform=cifar_test()
+                           )
+    
+    tsize = 10000
+    tset_raw = np.load(args.folder + 'CIFAR-100-C/%s.npy' %(corruptions[args.t]))
+    tset_raw = tset_raw[(args.level-1)*tsize: args.level*tsize]
+    
+    dset.data = tset_raw
+    
+    return dset
+
 def image_train(args, resize_size=256, crop_size=224, alexnet=False):
     if not alexnet:
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],

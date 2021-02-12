@@ -44,6 +44,13 @@ def data_load(args):
         
         dsets["test"] = cifar10c_dset_idx(args)
         dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
+    elif args.dset == 'CIFAR-100-C':
+        dsets["target"] = cifar100c_dset_idx(args)
+        dsets["target"].transform = cifar_train(args)
+        dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=False if args.ssl_task == 'none' else True)
+        
+        dsets["test"] = cifar100c_dset_idx(args)
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
     else:
         txt_tar = open(args.t_dset_path).readlines()
         txt_test = open(args.test_dset_path).readlines()
@@ -270,7 +277,7 @@ def train_target(args):
             netH.eval()
             if args.bottleneck != 0:
                 netB.eval()
-            if args.dset in ['visda-c', 'CIFAR-10-C']:
+            if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter, acc_s_te) + '\n' + acc_list
             else:
@@ -384,7 +391,7 @@ if __name__ == "__main__":
     parser.add_argument('--interval', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
     parser.add_argument('--worker', type=int, default=4, help="number of workers")
-    parser.add_argument('--dset', type=str, default='office-home', choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C'])
+    parser.add_argument('--dset', type=str, default='office-home', choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C'])
     parser.add_argument('--level', type=int, default=5)
     parser.add_argument('--folder', type=str, default='/SSD/euntae/data/')
     parser.add_argument('--lr', type=float, default=1e-2, help="learning rate")
@@ -439,10 +446,12 @@ if __name__ == "__main__":
     if args.dset == 'office-caltech':
         names = ['amazon', 'caltech', 'dslr', 'webcam']
         args.class_num = 10
-        
     if args.dset == 'CIFAR-10-C':
         names = corruptions
         args.class_num = 10
+    if args.dset == 'CIFAR-100-C':
+        names = corruptions
+        args.class_num = 100
         
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
     if len(args.gpu_id) > 1:
@@ -457,7 +466,7 @@ if __name__ == "__main__":
     # torch.backends.cudnn.deterministic = True
 
     for i in range(len(names)):
-        if args.dset == 'CIFAR-10-C':
+        if args.dset in ['CIFAR-10-C', 'CIFAR-100-C']:
             args.t = i
             args.name = names[args.t]
             args.savename = names[args.t]
