@@ -228,9 +228,15 @@ def cal_acc_oda(loader, netF, netB, netC):
 def train_source(args):
     dset_loaders = data_load(args)
     ## set base network
+    if args.norm_layer == 'batchnorm':
+        norm_layer = nn.BatchNorm2d
+    elif args.norm_layer == 'groupnorm':
+        def gn_helper(planes):
+            return nn.GroupNorm(8, planes)
+        norm_layer = gn_helper
     if args.net[0:3] == 'res':
         if '26' in args.net:
-            netF = network.ResCifarBase(26)
+            netF = network.ResCifarBase(26, norm_layer=norm_layer)
             args.bottleneck = netF.in_features // 2
         else:
             netF = network.ResBase(res_name=args.net)
