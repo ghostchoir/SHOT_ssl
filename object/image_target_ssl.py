@@ -42,6 +42,15 @@ def data_load(args):
         dsets["target"].transform = cifar_train(args)
         dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=False if args.ssl_task == 'none' else True)
         
+        dsets["pl"] = cifar10c_dset_idx(args)
+        if args.noisy_pl:
+            ssl_task = args.ssl_task
+            args.ssl_task = 'none'
+            dsets["pl"].transform = cifar_train(args)
+            args.ssl_task = ssl_task
+            
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
+        
         dsets["test"] = cifar10c_dset_idx(args)
         dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
     elif args.dset == 'CIFAR-100-C':
@@ -49,6 +58,14 @@ def data_load(args):
         dsets["target"].transform = cifar_train(args)
         dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=False if args.ssl_task == 'none' else True)
         
+        dsets["pl"] = cifar100c_dset_idx(args)
+        if args.noisy_pl:
+            ssl_task = args.ssl_task
+            args.ssl_task = 'none'
+            dsets["pl"].transform = cifar_train(args)
+            args.ssl_task = ssl_task
+            
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
         dsets["test"] = cifar100c_dset_idx(args)
         dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
     else:
@@ -77,6 +94,16 @@ def data_load(args):
             
         dsets["target"] = ImageList_idx(txt_tar, transform=image_train(args))
         dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=True)
+        
+        dsets["pl"] = ImageList_idx(txt_test, transform=image_test())
+        if args.noisy_pl:
+            ssl_task = args.ssl_task
+            args.ssl_task = 'none'
+            dsets["pl"].transform = image_train(args)
+            args.ssl_task = ssl_task
+            
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
+        
         dsets["test"] = ImageList_idx(txt_test, transform=image_test())
         dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
 
@@ -213,7 +240,7 @@ def train_target(args):
             netH.eval()
             if args.bottleneck != 0:
                 netB.eval()
-            mem_label = obtain_label(dset_loaders['test'], netF, netH, netB, netC, args)
+            mem_label = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
             netF.train()
             netH.train()
@@ -431,7 +458,7 @@ if __name__ == "__main__":
     parser.add_argument('--grayscale', type=bool, default=True)
     parser.add_argument('--gaussblur', type=bool, default=True)
     
-    parser.add_argument('--noisy_pl', type=bool, default=False)
+    parser.add_argument('--noisy_pl', action='store_true')
     args = parser.parse_args()
 
     if args.dset == 'office-home':
