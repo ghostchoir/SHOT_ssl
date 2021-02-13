@@ -470,7 +470,7 @@ if __name__ == "__main__":
     parser.add_argument('--folder', type=str, default='/SSD/euntae/data/')
     parser.add_argument('--lr', type=float, default=1e-2, help="learning rate")
     parser.add_argument('--net', type=str, default='resnet50', help="vgg16, resnet50, resnet101")
-    parser.add_argument('--pretrained', type=bool, default=True)
+    parser.add_argument('--nopretrained', action='store_true')
     parser.add_argument('--seed', type=int, default=2020, help="random seed")
     parser.add_argument('--bottleneck', type=int, default=256)
     parser.add_argument('--epsilon', type=float, default=1e-5)
@@ -484,15 +484,22 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
-    parser.add_argument('--norm_img', type=bool, default=True)
-    parser.add_argument('--norm_feat', type=bool, default=True)
+    parser.add_argument('--no_norm_img', action='store_true')
+    parser.add_argument('--no_norm_feat', action='store_true')
     parser.add_argument('--embedding_dim', type=int, default=128)
     parser.add_argument('--aug_type', type=str, default='simclr', choices=['none', 'simclr', 'simsiam', 'randaug'])
     parser.add_argument('--aug_strength', type=float, default=1.0)
-    parser.add_argument('--jitter', type=bool, default=True)
-    parser.add_argument('--grayscale', type=bool, default=True)
-    parser.add_argument('--gaussblur', type=bool, default=True)
+    parser.add_argument('--nojitter', action='store_true')
+    parser.add_argument('--nograyscale', action='store_true')
+    parser.add_argument('--nogaussblur', action='store_true')
     args = parser.parse_args()
+    
+    args.pretrained = not args.nopretrained
+    args.norm_img = not args.no_norm_img
+    args.norm_feat = not args.no_norm_feat
+    args.jitter = not args.nojitter
+    args.grayscale = not args.nograyscale
+    args.gaussblur = not args.nogaussblur
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']
