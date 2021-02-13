@@ -386,9 +386,15 @@ def train_source(args):
 def test_target(args):
     dset_loaders = data_load(args)
     ## set base network
+    if args.norm_layer == 'batchnorm':
+        norm_layer = nn.BatchNorm2d
+    elif args.norm_layer == 'groupnorm':
+        def gn_helper(planes):
+            return nn.GroupNorm(8, planes)
+        norm_layer = gn_helper
     if args.net[0:3] == 'res':
         if '26' in args.net:
-            netF = network.ResCifarBase(26)
+            netF = network.ResCifarBase(26, norm_layer=norm_layer)
             args.bottleneck = netF.in_features // 2
         else:
             netF = network.ResBase(res_name=args.net)
@@ -464,6 +470,7 @@ if __name__ == "__main__":
     parser.add_argument('--t', type=int, default=1, help="target")
     parser.add_argument('--max_epoch', type=int, default=20, help="max iterations")
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
+    parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
     parser.add_argument('--worker', type=int, default=8, help="number of workers")
     parser.add_argument('--dset', type=str, default='office-home', choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C'])
     parser.add_argument('--level', type=int, default=5)
