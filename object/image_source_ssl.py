@@ -255,7 +255,7 @@ def train_source(args):
     else:
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
-        netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck)
+        netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
         netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
     else:
         netB = None
@@ -341,7 +341,7 @@ def train_source(args):
             outputs_source = netC(f1)
             
         if args.smooth == 0:
-            classifier_loss = nn.CrossEntropyLoss()
+            classifier_loss = nn.CrossEntropyLoss()(outputs_source, labels_source)
         else:
             classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(outputs_source, labels_source)
         ssl_loss = ssl_loss_fn(z1, z2)
@@ -422,7 +422,7 @@ def test_target(args):
     else:
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
-        netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck)
+        netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
         netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
     else:
         netB = None
@@ -510,7 +510,8 @@ if __name__ == "__main__":
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')
-    parser.add_argument('--no_norm_feat', action='store_true')
+    parser.add_argument('--norm_feat', action='store_true')
+    parser.add_argument('--norm_btn', action='store_true')
     parser.add_argument('--embedding_dim', type=int, default=128)
     parser.add_argument('--aug_type', type=str, default='simclr', choices=['none', 'simclr', 'simsiam', 'randaug'])
     parser.add_argument('--aug_strength', type=float, default=1.0)
@@ -521,7 +522,6 @@ if __name__ == "__main__":
     
     args.pretrained = not args.nopretrained
     args.norm_img = not args.no_norm_img
-    args.norm_feat = not args.no_norm_feat
     args.jitter = not args.nojitter
     args.grayscale = not args.nograyscale
     args.gaussblur = not args.nogaussblur
