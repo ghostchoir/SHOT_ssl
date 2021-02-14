@@ -29,8 +29,15 @@ def op_copy(optimizer):
         param_group['lr0'] = param_group['lr']
     return optimizer
 
-def lr_scheduler(optimizer, iter_num, max_iter, gamma=10, power=0.75):
-    decay = (1 + gamma * iter_num / max_iter) ** (-power)
+def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
+    if args.scheduler == 'default':
+        decay = (1 + gamma * iter_num / max_iter) ** (-power)
+    elif args.scheduler == 'warmupcos':
+        warmup_iter = max_iter * args.warmup_ratio
+        if iter_num < warmup_iter:
+            decay = iter_num / warmup_iter
+        else:
+            decay = np.cos((iter_num - warmup_iter) * np.pi / (2*(max_iter - args.warmup_iter)))
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr0'] * decay
         param_group['weight_decay'] = 1e-3
@@ -476,6 +483,8 @@ if __name__ == "__main__":
     parser.add_argument('--t', type=int, default=1, help="target")
     parser.add_argument('--max_epoch', type=int, default=20, help="max iterations")
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
+    parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmpcos'])
+    parser.add_argument('--warmup_ratio', type=float, default=0.1)
     parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
     parser.add_argument('--worker', type=int, default=8, help="number of workers")
     parser.add_argument('--dset', type=str, default='office-home', choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C'])
