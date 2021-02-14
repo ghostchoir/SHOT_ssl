@@ -263,7 +263,7 @@ def train_target(args):
         inputs_test1, inputs_test2 = inputs_test[0].cuda(), inputs_test[1].cuda()
 
         iter_num += 1
-        lr_scheduler(optimizer, iter_num=iter_num, max_iter=max_iter)
+        lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter)
 
         if args.bottleneck != 0:
             if args.ssl_before_btn:

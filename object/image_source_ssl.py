@@ -318,7 +318,7 @@ def train_source(args):
                 continue
 
         iter_num += 1
-        lr_scheduler(optimizer, iter_num=iter_num, max_iter=max_iter)
+        lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter)
 
         inputs_source1, inputs_source2, labels_source = inputs_source[0].cuda(), inputs_source[1].cuda(), labels_source.cuda()
         if args.bottleneck != 0:
