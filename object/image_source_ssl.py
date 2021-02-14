@@ -37,7 +37,7 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
         if iter_num < warmup_iter:
             decay = iter_num / warmup_iter
         else:
-            decay = np.cos((iter_num - warmup_iter) * np.pi / (2*(max_iter - args.warmup_iter)))
+            decay = np.cos((iter_num - warmup_iter) * np.pi / (2*(max_iter - warmup_iter)))
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr0'] * decay
         param_group['weight_decay'] = 1e-3
