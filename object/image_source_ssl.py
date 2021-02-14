@@ -340,7 +340,10 @@ def train_source(args):
             z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
             outputs_source = netC(f1)
             
-        classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(outputs_source, labels_source)
+        if args.smooth == 0:
+            classifier_loss = nn.CrossEntropyLoss()
+        else:
+            classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(outputs_source, labels_source)
         ssl_loss = ssl_loss_fn(z1, z2)
         
         loss = classifier_loss + args.ssl_weight * ssl_loss
