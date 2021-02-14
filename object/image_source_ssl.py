@@ -483,7 +483,7 @@ if __name__ == "__main__":
     parser.add_argument('--t', type=int, default=1, help="target")
     parser.add_argument('--max_epoch', type=int, default=20, help="max iterations")
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
-    parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmpcos'])
+    parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
     parser.add_argument('--warmup_ratio', type=float, default=0.1)
     parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
     parser.add_argument('--worker', type=int, default=8, help="number of workers")
