@@ -11,7 +11,7 @@ import network, loss
 from torch.utils.data import DataLoader
 from data_list import ImageList, ImageList_idx, CIFAR10_idx
 from data import *
-from loss import NTXentLoss
+from loss import NTXentLoss, SupConLoss
 import random, pdb, math, copy
 from tqdm import tqdm
 from scipy.spatial.distance import cdist
@@ -224,8 +224,10 @@ def train_target(args):
         else:
             v.requires_grad = False
     
-    if args.ssl_task.lower() == 'simclr':
+    if args.ssl_task == 'simclr':
         ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
+    elif args.ssl_task == 'supcon':
+        ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
@@ -305,7 +307,15 @@ def train_target(args):
             im_loss = entropy_loss * args.ent_par
             classifier_loss += im_loss
             
-        ssl_loss = ssl_loss_fn(z1, z2)
+        if args.ssl_weight != 0:
+            if args.ssl_task == 'simclr':
+                ssl_loss = ssl_loss_fn(z1, z2)
+            elif args.ssl_task == 'supcon':
+                z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
+                ssl_loss = ssl_loss_fn(z, mem_label[tar_idx])
+        else:
+            ssl_loss = torch.tensor(0.0).cuda()
+                
         classifier_loss += args.ssl_weight * ssl_loss
 
         optimizer.zero_grad()
@@ -460,7 +470,7 @@ if __name__ == "__main__":
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda'])
     parser.add_argument('--issave', type=bool, default=True)
     
-    parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr'])
+    parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr', 'supcon'])
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')

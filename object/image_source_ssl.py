@@ -13,7 +13,7 @@ from data_list import ImageList
 from data import *
 import random, pdb, math, copy
 from tqdm import tqdm
-from loss import CrossEntropyLabelSmooth, NTXentLoss
+from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss
 from scipy.spatial.distance import cdist
 from sklearn.metrics import confusion_matrix
 from sklearn.cluster import KMeans
@@ -300,8 +300,10 @@ def train_source(args):
         netB.train()
     netC.train()
     
-    if args.ssl_task.lower() == 'simclr':
+    if args.ssl_task == 'simclr':
         ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
+    elif args.ssl_task == 'supcon':
+        ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
 
     while iter_num < max_iter:
         try:
@@ -344,7 +346,15 @@ def train_source(args):
             classifier_loss = nn.CrossEntropyLoss()(outputs_source, labels_source)
         else:
             classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(outputs_source, labels_source)
-        ssl_loss = ssl_loss_fn(z1, z2)
+            
+        if args.ssl_weight != 0:
+            if args.ssl_task == 'simclr':
+                ssl_loss = ssl_loss_fn(z1, z2)
+            elif args.ssl_task == 'supcon':
+                z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
+                ssl_loss = ssl_loss_fn(z, labels=labels_source)
+        else:
+            ssl_loss = torch.tensor(0.0).cuda()
         
         loss = classifier_loss + args.ssl_weight * ssl_loss
         
@@ -505,7 +515,7 @@ if __name__ == "__main__":
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda', 'oda'])
     parser.add_argument('--trte', type=str, default='val', choices=['full', 'val'])
-    parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr'])
+    parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr', 'supcon'])
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
