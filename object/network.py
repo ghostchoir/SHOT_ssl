@@ -83,7 +83,7 @@ class feat_bootleneck(nn.Module):
         self.bottleneck = nn.Linear(feature_dim, bottleneck_dim)
         self.bottleneck.apply(init_weights)
         self.type = type
-        self.norm_btn = True
+        self.norm_btn = norm_btn
 
     def forward(self, x):
         x = self.bottleneck(x)
