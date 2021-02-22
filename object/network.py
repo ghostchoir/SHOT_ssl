@@ -77,20 +77,27 @@ class ResBase(nn.Module):
 class feat_bootleneck(nn.Module):
     def __init__(self, feature_dim, bottleneck_dim=256, type="ori", norm_btn=False):
         super(feat_bootleneck, self).__init__()
-        self.bn = nn.BatchNorm1d(bottleneck_dim, affine=True)
         self.relu = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout(p=0.5)
         self.bottleneck = nn.Linear(feature_dim, bottleneck_dim)
         self.bottleneck.apply(init_weights)
         self.type = type
+
+        if self.type == "ori":
+            self.norm = None
+        elif self.type == "bn":
+            self.norm = nn.BatchNorm1d(bottleneck_dim)
+        elif self.type == "ln":
+            self.norm = nn.LayerNorm(bottleneck_dim)
+
         self.norm_btn = norm_btn
 
     def forward(self, x):
         x = self.bottleneck(x)
-        if self.type == "bn":
-            x = self.bn(x)
+        if self.norm is not None:
+            x = self.norm(x)
         if self.norm_btn:
-            x = F.normalize(x, dim=1)
+            x = F.normalize(x, dim=-1)
         return x
 
 class feat_classifier(nn.Module):

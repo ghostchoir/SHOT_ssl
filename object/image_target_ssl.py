@@ -463,7 +463,7 @@ if __name__ == "__main__":
     parser.add_argument('--bottleneck', type=int, default=256)
     parser.add_argument('--epsilon', type=float, default=1e-5)
     parser.add_argument('--layer', type=str, default="wn", choices=["linear", "wn"])
-    parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn"])
+    parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--distance', type=str, default='cosine', choices=["euclidean", "cosine"])  
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--output_src', type=str, default='san')
