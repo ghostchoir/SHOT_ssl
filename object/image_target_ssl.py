@@ -102,7 +102,7 @@ def data_load(args):
         dsets["target"] = ImageList_idx(txt_tar, transform=image_train(args))
         dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=True)
         
-        dsets["pl"] = ImageList_idx(txt_test, transform=image_test())
+        dsets["pl"] = ImageList_idx(txt_test, transform=image_test(args))
         if args.noisy_pl:
             ssl_task = args.ssl_task
             args.ssl_task = 'none'
@@ -111,7 +111,7 @@ def data_load(args):
             
         dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
         
-        dsets["test"] = ImageList_idx(txt_test, transform=image_test())
+        dsets["test"] = ImageList_idx(txt_test, transform=image_test(args))
         dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
 
     return dset_loaders

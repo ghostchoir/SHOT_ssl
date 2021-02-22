@@ -141,9 +141,9 @@ def data_load(args):
             
         dsets["source_tr"] = ImageList(tr_txt, transform=image_train(args))
         dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=False if args.ssl_task=='none' else True)
-        dsets["source_te"] = ImageList(te_txt, transform=image_test())
+        dsets["source_te"] = ImageList(te_txt, transform=image_test(args))
         dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs, shuffle=False, num_workers=args.worker, drop_last=False)
-        dsets["test"] = ImageList(txt_test, transform=image_test())
+        dsets["test"] = ImageList(txt_test, transform=image_test(args))
         dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
 
     return dset_loaders
