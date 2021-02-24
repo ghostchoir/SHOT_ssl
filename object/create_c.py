@@ -34,23 +34,43 @@ def find_classes(dir):
     return classes, class_to_idx
 
 
-def make_dataset(dir, class_to_idx):
-    images = []
-    dir = os.path.expanduser(dir)
-    for target in sorted(os.listdir(dir)):
-        d = os.path.join(dir, target)
-        if not os.path.isdir(d):
-            continue
+# def make_dataset(dir, class_to_idx):
+#     images = []
+#     dir = os.path.expanduser(dir)
+#     for target in sorted(os.listdir(dir)):
+#         d = os.path.join(dir, target)
+#         if not os.path.isdir(d):
+#             continue
+#
+#         for root, _, fnames in sorted(os.walk(d)):
+#             for fname in sorted(fnames):
+#                 if is_image_file(fname):
+#                     path = os.path.join(root, fname)
+#                     item = (path, class_to_idx[target])
+#                     images.append(item)
+#
+#     return images
 
-        for root, _, fnames in sorted(os.walk(d)):
-            for fname in sorted(fnames):
-                if is_image_file(fname):
-                    path = os.path.join(root, fname)
-                    item = (path, class_to_idx[target])
-                    images.append(item)
-
+def make_dataset(image_list, labels):
+    if labels:
+      len_ = len(image_list)
+      images = [(image_list[i].strip(), labels[i, :]) for i in range(len_)]
+    else:
+      if len(image_list[0].split()) > 2:
+        images = [(val.split()[0], np.array([int(la) for la in val.split()[1:]])) for val in image_list]
+      else:
+        images = [(val.split()[0], int(val.split()[1])) for val in image_list]
     return images
 
+def rgb_loader(path):
+    with open(path, 'rb') as f:
+        with Image.open(f) as img:
+            return img.convert('RGB')
+
+def l_loader(path):
+    with open(path, 'rb') as f:
+        with Image.open(f) as img:
+            return img.convert('L')
 
 def pil_loader(path):
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
@@ -75,6 +95,49 @@ def default_loader(path):
     else:
         return pil_loader(path)
 
+
+class DistortedImageList(data.Dataset):
+    def __init__(self, image_list, method, severity, labels=None, transform=None, target_transform=None, mode='RGB'):
+        imgs = make_dataset(image_list, labels)
+        if len(imgs) == 0:
+            raise(RuntimeError("Found 0 images in subfolders of: " + root + "\n"
+                               "Supported image extensions are: " + ",".join(IMG_EXTENSIONS)))
+
+        self.imgs = imgs
+        self.transform = transform
+        self.target_transform = target_transform
+
+        self.method = method
+        self.severity = severity
+
+        if mode == 'RGB':
+            self.loader = rgb_loader
+        elif mode == 'L':
+            self.loader = l_loader
+
+    def __getitem__(self, index):
+        path, target = self.imgs[index]
+        img = self.loader(path)
+        if self.transform is not None:
+            img = self.transform(img)
+            img = self.method(img, self.severity)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        save_path = '/SSD/euntae/data/DistortedVisDA/JPEG/' + self.method.__name__ + \
+                    '/' + str(self.severity) + '/' + str(target)
+
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        save_path += path[path.rindex('/'):]
+
+        Image.fromarray(np.uint8(img)).save(save_path, quality=85, optimize=True)
+
+        return 0  # we do not care about returning the data
+
+    def __len__(self):
+        return len(self.imgs)
 
 class DistortImageFolder(data.Dataset):
     def __init__(self, root, method, severity, transform=None, target_transform=None,
@@ -272,16 +335,16 @@ def speckle_noise(x, severity=1):
     return np.clip(x + x * np.random.normal(size=x.shape, scale=c), 0, 1) * 255
 
 
-def fgsm(x, source_net, severity=1):
-    c = [8, 16, 32, 64, 128][severity - 1]
-
-    x = V(x, requires_grad=True)
-    logits = source_net(x)
-    source_net.zero_grad()
-    loss = F.cross_entropy(logits, V(logits.data.max(1)[1].squeeze_()), size_average=False)
-    loss.backward()
-
-    return standardize(torch.clamp(unstandardize(x.data) + c / 255. * unstandardize(torch.sign(x.grad.data)), 0, 1))
+# def fgsm(x, source_net, severity=1):
+#     c = [8, 16, 32, 64, 128][severity - 1]
+#
+#     x = V(x, requires_grad=True)
+#     logits = source_net(x)
+#     source_net.zero_grad()
+#     loss = F.cross_entropy(logits, V(logits.data.max(1)[1].squeeze_()), size_average=False)
+#     loss.backward()
+#
+#     return standardize(torch.clamp(unstandardize(x.data) + c / 255. * unstandardize(torch.sign(x.grad.data)), 0, 1))
 
 
 def gaussian_blur(x, severity=1):
@@ -575,12 +638,18 @@ def elastic_transform(image, severity=1):
 def save_distorted(method=gaussian_noise):
     for severity in range(1, 6):
         print(method.__name__, severity)
-        distorted_dataset = DistortImageFolder(
-            root="/share/data/vision-greg/ImageNet/clsloc/images/val",
-            method=method, severity=severity,
-            transform=trn.Compose([trn.Resize(256), trn.CenterCrop(224)]))
+        distorted_dataset = DistortedImageList(
+            image_list=open('/SSD/euntae/data/visda-c/validation_list.txt').readlines(),
+            method=method,
+            severity=severity,
+            transform=trn.Compose([trn.Resize(256), trn.CenterCrop(224)])
+        )
+        #distorted_dataset = DistortImageFolder(
+        #    root="/share/data/vision-greg/ImageNet/clsloc/images/val",
+        #    method=method, severity=severity,
+        #    transform=trn.Compose([trn.Resize(256), trn.CenterCrop(224)]))
         distorted_dataset_loader = torch.utils.data.DataLoader(
-            distorted_dataset, batch_size=100, shuffle=False, num_workers=4)
+            distorted_dataset, batch_size=100, shuffle=False, num_workers=8)
 
         for _ in distorted_dataset_loader: continue
 
