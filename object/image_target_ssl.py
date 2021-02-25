@@ -5,6 +5,7 @@ import torchvision
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import transforms, datasets
 import network, loss
@@ -255,7 +256,7 @@ def train_target(args):
             netH.eval()
             if args.bottleneck != 0:
                 netB.eval()
-            mem_label = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
+            mem_label, mem_conf = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
             netF.train()
             netH.train()
@@ -289,8 +290,14 @@ def train_target(args):
             outputs_test = netC(f1)
 
         if args.cls_par > 0:
+            #with torch.no_grad():
+            #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
+            #    conf = conf.cpu().numpy()
+            conf = mem_conf[tar_idx]
+
             pred = mem_label[tar_idx]
-            classifier_loss = nn.CrossEntropyLoss()(outputs_test, pred)
+            classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf>=args.pl_threshold],
+                                                    pred[conf>=args.pl_threshold])
             classifier_loss *= args.cls_par
             if iter_num < interval_iter and args.dset == "visda-c":
                 classifier_loss *= 0
@@ -392,7 +399,7 @@ def obtain_label(loader, netF, netH, netB, netC, args):
     all_output = nn.Softmax(dim=1)(all_output)
     ent = torch.sum(-all_output * torch.log(all_output + args.epsilon), dim=1)
     unknown_weight = 1 - ent / np.log(args.class_num)
-    _, predict = torch.max(all_output, 1)
+    conf, predict = torch.max(all_output, 1)
     #print('predict', predict.size())
 
     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
@@ -429,7 +436,7 @@ def obtain_label(loader, netF, netH, netB, netC, args):
     args.out_file.flush()
     print(log_str+'\n')
 
-    return pred_label.astype('int')
+    return pred_label.astype('int'), conf.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -473,6 +480,7 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr', 'supcon'])
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--fixmatch', action='store_true')
+    parser.add_argument('--conf_threshold', type=float, default=0.8)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')
