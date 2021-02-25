@@ -187,7 +187,7 @@ def train_target(args):
     netH.load_state_dict(torch.load(modelpath))
     if args.bottleneck != 0:
         modelpath = args.output_dir_src + '/source_B.pt'   
-        netB.load_state_dict(torch.load(modelpath))
+        netB.load_state_dict(torch.load(modelpath), strict=False)
     modelpath = args.output_dir_src + '/source_C.pt'    
     netC.load_state_dict(torch.load(modelpath))
     netC.eval()
