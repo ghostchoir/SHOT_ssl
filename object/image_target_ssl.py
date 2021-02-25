@@ -296,8 +296,8 @@ def train_target(args):
             conf = mem_conf[tar_idx]
 
             pred = mem_label[tar_idx]
-            classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf>=args.pl_threshold],
-                                                    pred[conf>=args.pl_threshold])
+            classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf>=args.conf_threshold],
+                                                    pred[conf>=args.conf_threshold])
             classifier_loss *= args.cls_par
             if iter_num < interval_iter and args.dset == "visda-c":
                 classifier_loss *= 0
