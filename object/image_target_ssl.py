@@ -126,10 +126,7 @@ def cal_acc(loader, netF, netH, netB, netC, flag=False):
             inputs = data[0]
             labels = data[1]
             inputs = inputs.cuda()
-            if args.bottleneck != 0:
-                outputs = netC(netB(netF(inputs)))
-            else:
-                outputs = netC(netF(inputs))
+            outputs = netC(netB(netF(inputs)))
             if start_test:
                 all_output = outputs.float().cpu()
                 all_label = labels.float()
@@ -178,16 +175,18 @@ def train_target(args):
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
         netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
     else:
-        netB = None
+        netB = nn.Identity()
         netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features)
     
     modelpath = args.output_dir_src + '/source_F.pt'   
     netF.load_state_dict(torch.load(modelpath))
     modelpath = args.output_dir_src + '/source_H.pt'   
     netH.load_state_dict(torch.load(modelpath))
-    if args.bottleneck != 0:
-        modelpath = args.output_dir_src + '/source_B.pt'   
+    try:
+        modelpath = args.output_dir_src + '/source_B.pt'
         netB.load_state_dict(torch.load(modelpath), strict=False)
+    except:
+        print('Skipped loading btn for version compatibility')
     modelpath = args.output_dir_src + '/source_C.pt'    
     netC.load_state_dict(torch.load(modelpath))
     netC.eval()
@@ -197,14 +196,12 @@ def train_target(args):
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
         netH = nn.DataParallel(netH).cuda()
-        if args.bottleneck != 0:
-            netB = nn.DataParallel(netB).cuda()
+        netB = nn.DataParallel(netB).cuda()
         netC = nn.DataParallel(netC).cuda()
     else:
         netF.cuda()
         netH.cuda()
-        if args.bottleneck != 0:
-            netB.cuda()
+        netB.cuda()
         netC.cuda()
 
     param_group = []
@@ -213,12 +210,11 @@ def train_target(args):
             param_group += [{'params': v, 'lr': args.lr * args.lr_decay1}]
         else:
             v.requires_grad = False
-    if args.bottleneck != 0:
-        for k, v in netB.named_parameters():
-            if args.lr_decay2 > 0:
-                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
-            else:
-                v.requires_grad = False
+    for k, v in netB.named_parameters():
+        if args.lr_decay2 > 0:
+            param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
+        else:
+            v.requires_grad = False
     for k, v in netH.named_parameters():
         if args.lr_decay2 > 0:
             param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]   
@@ -230,6 +226,14 @@ def train_target(args):
     elif args.ssl_task == 'supcon':
         ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
 
+    if args.cr_weight > 0:
+        if args.cr_metric == 'cos':
+            dist = nn.CosineSimilarity(dim=1).cuda()
+        elif args.cr_metric == 'l1':
+            dist = nn.PairwiseDistance(p=1)
+        elif args.cr_metric == 'l2':
+            dist = nn.PairwiseDistance(p=2)
+
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
 
@@ -240,9 +244,12 @@ def train_target(args):
     while iter_num < max_iter:
         try:
             inputs_test, _, tar_idx = iter_test.next()
+            inputs_pl, _, tar_idx = iter_pl.next()
         except:
             iter_test = iter(dset_loaders["target"])
             inputs_test, _, tar_idx = iter_test.next()
+            iter_pl = iter(dset_loaders["pl"])
+            inputs_pl, _, tar_idx = iter_pl.next()
 
         try:
             if inputs_test.size(0) == 1:
@@ -254,40 +261,40 @@ def train_target(args):
         if iter_num % interval_iter == 0 and args.cls_par > 0:
             netF.eval()
             netH.eval()
-            if args.bottleneck != 0:
-                netB.eval()
+            netB.eval()
             mem_label, mem_conf = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
             netF.train()
             netH.train()
-            if args.bottleneck != 0:
-                netB.train()
+            netB.train()
 
         inputs_test1, inputs_test2 = inputs_test[0].cuda(), inputs_test[1].cuda()
 
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter)
 
-        if args.bottleneck != 0:
-            if args.ssl_before_btn:
-                f1, f2 = netF(inputs_test1), netF(inputs_test2)
-                
-                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-                
-                outputs_test = netC(netB(f1))
-                
-            else:
-                f1, f2 = netB(netF(inputs_test1)), netB(netF(inputs_test2))
-                
-                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-                
-                outputs_test = netC(f1)
-        else:
+        if args.ssl_before_btn:
             f1, f2 = netF(inputs_test1), netF(inputs_test2)
-                
+
             z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-                
+
+            outputs_test = netC(netB(f1))
+
+        else:
+            f1, f2 = netB(netF(inputs_test1)), netB(netF(inputs_test2))
+
+            z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+
             outputs_test = netC(f1)
+
+        if args.cr_weight > 0:
+            with torch.no_grad():
+                if args.cr_site == 'feat':
+                    f_pl = netF(inputs_pl)
+                elif args.cr_site == 'btn':
+                    f_pl = netB(netF(inputs_pl))
+                else:
+                    raise NotImplementedError
 
         if args.cls_par > 0:
             #with torch.no_grad():
@@ -322,8 +329,14 @@ def train_target(args):
                 ssl_loss = ssl_loss_fn(z, mem_label[tar_idx])
         else:
             ssl_loss = torch.tensor(0.0).cuda()
+
+        if args.cr_weight > 0:
+            cr_loss = dist(f1, f_pl)
+        else:
+            cr_loss = torch.tensor(0.0).cuda()
                 
         classifier_loss += args.ssl_weight * ssl_loss
+        classifier_loss += args.cr_weight * cr_loss
 
         optimizer.zero_grad()
         classifier_loss.backward()
@@ -332,8 +345,7 @@ def train_target(args):
         if iter_num % interval_iter == 0 or iter_num == max_iter:
             netF.eval()
             netH.eval()
-            if args.bottleneck != 0:
-                netB.eval()
+            netB.eval()
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter, acc_s_te) + '\n' + acc_list
@@ -346,21 +358,18 @@ def train_target(args):
             print(log_str+'\n')
             netF.train()
             netH.train()
-            if args.bottleneck != 0:
-                netB.train()
+            netB.train()
 
     if args.issave:
         if args.dataparallel:
             torch.save(netF.module.state_dict(), osp.join(args.output_dir, "target_F_" + args.savename + ".pt"))
             torch.save(netH.module.state_dict(), osp.join(args.output_dir, "target_H_" + args.savename + ".pt"))
-            if args.bottleneck != 0:
-                torch.save(netB.module.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
+            torch.save(netB.module.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
             torch.save(netC.module.state_dict(), osp.join(args.output_dir, "target_C_" + args.savename + ".pt"))
         else:
             torch.save(netF.state_dict(), osp.join(args.output_dir, "target_F_" + args.savename + ".pt"))
             torch.save(netH.state_dict(), osp.join(args.output_dir, "target_H_" + args.savename + ".pt"))
-            if args.bottleneck != 0:
-                torch.save(netB.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
+            torch.save(netB.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
             torch.save(netC.state_dict(), osp.join(args.output_dir, "target_C_" + args.savename + ".pt"))
         
     return netF, netH, netB, netC
@@ -381,10 +390,7 @@ def obtain_label(loader, netF, netH, netB, netC, args):
             inputs = data[0]
             labels = data[1]
             inputs = inputs.cuda()
-            if args.bottleneck != 0:
-                feas = netB(netF(inputs))
-            else:
-                feas = netF(inputs)
+            feas = netB(netF(inputs))
             outputs = netC(feas)
             if start_test:
                 all_fea = feas.float().cpu()
@@ -479,7 +485,8 @@ if __name__ == "__main__":
     
     parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr', 'supcon'])
     parser.add_argument('--ssl_weight', type=float, default=0.1)
-    parser.add_argument('--fixmatch', action='store_true')
+    parser.add_argument('--cr_weight', type=float, default=0.0)
+    parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2'])
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
