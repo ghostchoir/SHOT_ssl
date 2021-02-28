@@ -480,7 +480,7 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr', 'supcon'])
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--fixmatch', action='store_true')
-    parser.add_argument('--conf_threshold', type=float, default=0.8)
+    parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')
