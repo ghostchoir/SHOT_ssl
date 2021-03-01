@@ -367,7 +367,10 @@ def train_source(args):
             ssl_loss = torch.tensor(0.0).cuda()
 
         if args.cr_weight > 0:
-            cr_loss = dist(f_hard, f_weak)
+            cr_loss = dist(f_hard, f_weak).mean()
+
+            if args.cr_metric == 'cos':
+                cr_loss *= -1
         else:
             cr_loss = torch.tensor(0.0).cuda()
         
