@@ -45,9 +45,10 @@ class TripletCompose(object):
         img1 = img.copy()
         img2 = img.copy()
         img3 = img.copy()
-        for t1, t2, t3 in zip(self.trfs1, self.trfs2, self.trfs3):
+        for t1, t2 in zip(self.trfs1, self.trfs2):
             img1 = t1(img1)
             img2 = t2(img2)
+        for t3 in zip(self.trfs3):
             img3 = t3(img3)
         return img1, img2, img3
 
