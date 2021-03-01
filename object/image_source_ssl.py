@@ -306,12 +306,9 @@ def train_source(args):
     while iter_num < max_iter:
         try:
             inputs_source, labels_source = iter_source.next()
-            inputs_pl, labels_pl = iter_pl.next()
         except:
             iter_source = iter(dset_loaders["source_tr"])
             inputs_source, labels_source = iter_source.next()
-            iter_pl = iter(dset_loaders["pl"])
-            inputs_pl, labels_pl = iter_pl.next()
 
         try:
             if inputs_source.size(0) == 1:
@@ -325,27 +322,35 @@ def train_source(args):
 
         inputs_source1, inputs_source2, labels_source = inputs_source[0].cuda(), inputs_source[1].cuda(), labels_source.cuda()
 
+        if args.cr_weight > 0:
+            inputs_source3 = inputs_source[2].cuda()
+
+        f1, f2 = netF(inputs_source1), netF(inputs_source2)
+
+        b1, b2 = netB(f1), netB(f2)
+
+        outputs_source = netC(b1)
+
         if args.ssl_before_btn:
-            f1, f2 = netF(inputs_source1), netF(inputs_source2)
-
             z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-
-            outputs_source = netC(netB(f1))
         else:
-            f1, f2 = netB(netF(inputs_source1)), netB(netF(inputs_source2))
-
-            z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-
-            outputs_source = netC(f1)
+            z1, z2 = netH(b1, args.norm_feat), netH(b2, args.norm_feat)
 
         if args.cr_weight > 0:
-            with torch.no_grad():
-                if args.cr_site == 'feat':
-                    f_pl = netF(inputs_pl)
-                elif args.cr_site == 'btn':
-                    f_pl = netB(netF(inputs_pl))
-                else:
-                    raise NotImplementedError
+            if args.cr_site == 'feat':
+                f_hard = f1
+                with torch.no_grad():
+                    f_weak = netF(inputs_source3)
+            elif args.cr_site == 'btn':
+                f_hard = b1
+                with torch.no_grad():
+                    f_weak = netB(netF(inputs_source3))
+            elif args.cr_site == 'cls':
+                f_hard = outputs_source
+                with torch.no_grad():
+                    f_weak = netC(netB(netF(inputs_source3)))
+            else:
+                raise NotImplementedError
 
         if args.smooth == 0:
             classifier_loss = nn.CrossEntropyLoss()(outputs_source, labels_source)
@@ -362,7 +367,7 @@ def train_source(args):
             ssl_loss = torch.tensor(0.0).cuda()
 
         if args.cr_weight > 0:
-            cr_loss = dist(f1, f_pl)
+            cr_loss = dist(f_hard, f_weak)
         else:
             cr_loss = torch.tensor(0.0).cuda()
         
@@ -523,6 +528,7 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2'])
+    parser.add_argument('--cr_site', type=str, default='feat', choices=['feat', 'btn', 'cls'])
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')

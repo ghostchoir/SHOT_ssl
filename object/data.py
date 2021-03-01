@@ -35,6 +35,21 @@ class DualCompose(object):
             img2 = t2(img2)
         return img1, img2
 
+class TripletCompose(object):
+    def __init__(self, trfs1, trfs2, trfs3):
+        self.trfs1 = trfs1
+        self.trfs2 = trfs2
+        self.trfs3 = trfs3
+
+    def __call__(self, img):
+        img1 = img.copy()
+        img2 = img.copy()
+        img3 = img.copy()
+        for t1, t2, t3 in zip(self.trfs1, self.trfs2, self.trfs3):
+            img1 = t1(img1)
+            img2 = t2(img2)
+            img3 = t3(img3)
+        return img1, img2, img3
 
 class GaussianBlur(object):
     # Implements Gaussian blur as described in the SimCLR paper
@@ -115,7 +130,7 @@ class GaussianBlur(object):
 def cifar_train(args):
     normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
 
-    if args.fixmatch:
+    if args.cr_weight > 0:
         s = args.aug_strength
         color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
 
@@ -128,7 +143,9 @@ def cifar_train(args):
             transforms.ToTensor(),
         ]
 
-        trfs2 = [
+        trfs2 = trfs1
+
+        trfs3 = [
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
@@ -136,9 +153,10 @@ def cifar_train(args):
 
         if args.norm_img:
             trfs1.append(normalize)
-            trfs2.append(normalize)
+            trfs3.append(normalize)
 
-        return DualCompose(trfs1, trfs2)
+
+        return TripletCompose(trfs1, trfs2, trfs3)
 
     if args.aug_type == 'simclr':
         s = args.aug_strength
@@ -249,7 +267,7 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
     else:
         normalize = Normalize(meanfile='./ilsvrc_2012_mean.npy')
 
-    if args.fixmatch:
+    if args.cr_weight > 0:
         s = args.aug_strength
         color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
 
@@ -262,7 +280,9 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
             transforms.ToTensor(),
         ]
 
-        trfs2 = [
+        trfs2 = trfs1
+
+        trfs3 = [
             transforms.Resize((resize_size, resize_size)),
             transforms.RandomCrop(crop_size),
             transforms.RandomHorizontalFlip(),
@@ -271,9 +291,9 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
 
         if args.norm_img:
             trfs1.append(normalize)
-            trfs2.append(normalize)
+            trfs3.append(normalize)
 
-        return DualCompose(trfs1, trfs2)
+        return TripletCompose(trfs1, trfs2, trfs3)
 
     if args.aug_type == 'simclr':
         s = args.aug_strength
@@ -317,4 +337,4 @@ def image_test(args, resize_size=256, crop_size=224, alexnet=False):
     if args.norm_img:
         trfs.append(normalize)
 
-    return  transforms.Compose(trfs)
+    return transforms.Compose(trfs)

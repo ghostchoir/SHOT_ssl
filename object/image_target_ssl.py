@@ -244,12 +244,9 @@ def train_target(args):
     while iter_num < max_iter:
         try:
             inputs_test, _, tar_idx = iter_test.next()
-            inputs_pl, _, tar_idx = iter_pl.next()
         except:
             iter_test = iter(dset_loaders["target"])
             inputs_test, _, tar_idx = iter_test.next()
-            iter_pl = iter(dset_loaders["pl"])
-            inputs_pl, _, tar_idx = iter_pl.next()
 
         try:
             if inputs_test.size(0) == 1:
@@ -273,28 +270,36 @@ def train_target(args):
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter)
 
-        if args.ssl_before_btn:
-            f1, f2 = netF(inputs_test1), netF(inputs_test2)
-
-            z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-
-            outputs_test = netC(netB(f1))
-
-        else:
-            f1, f2 = netB(netF(inputs_test1)), netB(netF(inputs_test2))
-
-            z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-
-            outputs_test = netC(f1)
 
         if args.cr_weight > 0:
-            with torch.no_grad():
-                if args.cr_site == 'feat':
-                    f_pl = netF(inputs_pl)
-                elif args.cr_site == 'btn':
-                    f_pl = netB(netF(inputs_pl))
-                else:
-                    raise NotImplementedError
+            inputs_test3 = inputs_test[2].cuda()
+
+        f1, f2 = netF(inputs_test1), netF(inputs_test2)
+
+        b1, b2 = netB(f1), netB(f2)
+
+        outputs_test = netC(b1)
+
+        if args.ssl_before_btn:
+            z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+        else:
+            z1, z2 = netH(b1, args.norm_feat), netH(b2, args.norm_feat)
+
+        if args.cr_weight > 0:
+            if args.cr_site == 'feat':
+                f_hard = f1
+                with torch.no_grad():
+                    f_weak = netF(inputs_test3)
+            elif args.cr_site == 'btn':
+                f_hard = b1
+                with torch.no_grad():
+                    f_weak = netB(netF(inputs_test3))
+            elif args.cr_site == 'cls':
+                f_hard = outputs_test
+                with torch.no_grad():
+                    f_weak = netC(netB(netF(inputs_test3)))
+            else:
+                raise NotImplementedError
 
         if args.cls_par > 0:
             #with torch.no_grad():
@@ -331,7 +336,7 @@ def train_target(args):
             ssl_loss = torch.tensor(0.0).cuda()
 
         if args.cr_weight > 0:
-            cr_loss = dist(f1, f_pl)
+            cr_loss = dist(f_hard, f_weak)
         else:
             cr_loss = torch.tensor(0.0).cuda()
                 
