@@ -5,6 +5,7 @@ import torchvision
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import transforms, datasets
 import network, loss
@@ -325,6 +326,12 @@ def train_source(args):
         if args.cr_weight > 0:
             inputs_source3 = inputs_source[2].cuda()
 
+            with torch.no_grad():
+                f3 = netF(inputs_source3)
+                b3 = netB(f3)
+                c3 = netC(b3)
+                conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
+
         f1, f2 = netF(inputs_source1), netF(inputs_source2)
 
         b1, b2 = netB(f1), netB(f2)
@@ -339,16 +346,13 @@ def train_source(args):
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
                 f_hard = f1
-                with torch.no_grad():
-                    f_weak = netF(inputs_source3)
+                f_weak = f3
             elif args.cr_site == 'btn':
                 f_hard = b1
-                with torch.no_grad():
-                    f_weak = netB(netF(inputs_source3))
+                f_weak = b3
             elif args.cr_site == 'cls':
                 f_hard = outputs_source
-                with torch.no_grad():
-                    f_weak = netC(netB(netF(inputs_source3)))
+                f_weak = c3
             else:
                 raise NotImplementedError
 
@@ -367,10 +371,14 @@ def train_source(args):
             ssl_loss = torch.tensor(0.0).cuda()
 
         if args.cr_weight > 0:
-            cr_loss = dist(f_hard, f_weak).mean()
 
-            if args.cr_metric == 'cos':
-                cr_loss *= -1
+            try:
+                cr_loss = dist(f_hard[conf<=args.cr_threshold], f_weak[conf<=args.cr_threshold]).mean()
+
+                if args.cr_metric == 'cos':
+                    cr_loss *= -1
+            except:
+                cr_loss = torch.tensor(0.0).cuda()
         else:
             cr_loss = torch.tensor(0.0).cuda()
         

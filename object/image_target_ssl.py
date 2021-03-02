@@ -274,6 +274,12 @@ def train_target(args):
         if args.cr_weight > 0:
             inputs_test3 = inputs_test[2].cuda()
 
+            with torch.no_grad():
+                f3 = netF(inputs_test3)
+                b3 = netB(f3)
+                c3 = netC(b3)
+                conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
+
         f1, f2 = netF(inputs_test1), netF(inputs_test2)
 
         b1, b2 = netB(f1), netB(f2)
@@ -288,16 +294,13 @@ def train_target(args):
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
                 f_hard = f1
-                with torch.no_grad():
-                    f_weak = netF(inputs_test3)
+                f_weak = f3
             elif args.cr_site == 'btn':
                 f_hard = b1
-                with torch.no_grad():
-                    f_weak = netB(netF(inputs_test3))
+                f_weak = b3
             elif args.cr_site == 'cls':
                 f_hard = outputs_test
-                with torch.no_grad():
-                    f_weak = netC(netB(netF(inputs_test3)))
+                f_weak = c3
             else:
                 raise NotImplementedError
 
@@ -305,7 +308,7 @@ def train_target(args):
             #with torch.no_grad():
             #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
             #    conf = conf.cpu().numpy()
-            conf = mem_conf[tar_idx]
+            #conf = mem_conf[tar_idx]
 
             pred = mem_label[tar_idx]
             classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf>=args.conf_threshold],
@@ -336,10 +339,13 @@ def train_target(args):
             ssl_loss = torch.tensor(0.0).cuda()
 
         if args.cr_weight > 0:
-            cr_loss = dist(f_hard, f_weak).mean()
+            try:
+                cr_loss = dist(f_hard[conf<=args.cr_threshold], f_weak[conf<=args.cr_threshold]).mean()
 
-            if args.cr_metric == 'cos':
-                cr_loss *= -1
+                if args.cr_metric == 'cos':
+                    cr_loss *= -1
+            except:
+                cr_loss = torch.tensor(0.0).cuda()
         else:
             cr_loss = torch.tensor(0.0).cuda()
                 
@@ -496,6 +502,7 @@ if __name__ == "__main__":
     parser.add_argument('--cr_weight', type=float, default=0.0)
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
+    parser.add_argument('--cr_threshold', type=float, default=1.0)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
