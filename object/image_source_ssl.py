@@ -251,10 +251,10 @@ def train_source(args):
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
-        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck, bias=args.classifier_bias)
     else:
         netB = nn.Identity()
-        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features)
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features, bias=args.classifier_bias)
     
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
@@ -454,10 +454,10 @@ def test_target(args):
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
-        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck)
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck, bias=args.classifier_bias)
     else:
         netB = nn.Identity()
-        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features)
+        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features, bias=args.classifier_bias)
     
     
     args.modelpath = args.output_dir_src + '/source_F.pt'   
@@ -531,6 +531,7 @@ if __name__ == "__main__":
     parser.add_argument('--epsilon', type=float, default=1e-5)
     parser.add_argument('--layer', type=str, default="wn", choices=["linear", "wn"])
     parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
+    parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--smooth', type=float, default=0.1)   
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda', 'oda'])
@@ -558,6 +559,7 @@ if __name__ == "__main__":
     args.jitter = not args.nojitter
     args.grayscale = not args.nograyscale
     args.gaussblur = not args.nogaussblur
+    args.classifier_bias = not args.classifier_bias_off
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']
