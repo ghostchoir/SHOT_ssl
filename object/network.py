@@ -23,7 +23,10 @@ def init_weights(m):
         nn.init.zeros_(m.bias)
     elif classname.find('Linear') != -1:
         nn.init.xavier_normal_(m.weight)
-        nn.init.zeros_(m.bias)
+        try:
+            nn.init.zeros_(m.bias)
+        except:
+            pass
 
 vgg_dict = {"vgg11":models.vgg11, "vgg13":models.vgg13, "vgg16":models.vgg16, "vgg19":models.vgg19, 
 "vgg11bn":models.vgg11_bn, "vgg13bn":models.vgg13_bn, "vgg16bn":models.vgg16_bn, "vgg19bn":models.vgg19_bn} 
