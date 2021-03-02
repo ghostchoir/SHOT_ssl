@@ -308,11 +308,11 @@ def train_target(args):
             #with torch.no_grad():
             #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
             #    conf = conf.cpu().numpy()
-            #conf = mem_conf[tar_idx]
+            conf_cls = mem_conf[tar_idx]
 
             pred = mem_label[tar_idx]
-            classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf>=args.conf_threshold],
-                                                    pred[conf>=args.conf_threshold])
+            classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf_cls>=args.conf_threshold],
+                                                    pred[conf_cls>=args.conf_threshold])
             classifier_loss *= args.cls_par
             if iter_num < interval_iter and args.dset == "visda-c":
                 classifier_loss *= 0
