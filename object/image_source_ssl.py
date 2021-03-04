@@ -344,15 +344,7 @@ def train_source(args):
 
         b1, b2 = netB(f1), netB(f2)
 
-        if args.angular_logit:
-            b1 = F.normalize(b1, dim=1)
-            if args.dataparallel:
-                w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1).cuda()
-            else:
-                w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1).cuda()
-            outputs_source = torch.matmul(b1, w_norm) / args.angular_temp
-        else:
-            outputs_source = netC(b1)
+        outputs_source = netC(b1)
 
         if args.ssl_before_btn:
             z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
