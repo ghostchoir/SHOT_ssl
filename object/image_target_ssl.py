@@ -427,10 +427,10 @@ def obtain_label(loader, netF, netH, netB, netC, args):
             if args.angular_logit:
                 feas_norm = F.normalize(feas, dim=1)
                 if args.dataparallel:
-                    w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0,1)
+                    w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1)
                 else:
                     w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1)
-                outputs = torch.matmul(feas_norm, w_norm.cuda())
+                outputs = torch.matmul(feas_norm, w_norm.cuda()) / args.angular_temp
             else:
                 outputs = netC(feas)
             if start_test:
@@ -533,6 +533,7 @@ if __name__ == "__main__":
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
     parser.add_argument('--cr_threshold', type=float, default=1.0)
     parser.add_argument('--angular_logit', action='store_true')
+    parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
