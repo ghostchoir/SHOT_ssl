@@ -251,10 +251,18 @@ def train_source(args):
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
-        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck, bias=args.classifier_bias)
+        netC = network.feat_classifier(type=args.layer,
+                                       class_num=args.class_num,
+                                       bottleneck_dim=args.bottleneck,
+                                       bias=args.classifier_bias,
+                                       temp=args.angular_temp)
     else:
         netB = nn.Identity()
-        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features, bias=args.classifier_bias)
+        netC = network.feat_classifier(type=args.layer,
+                                       class_num=args.class_num,
+                                       bottleneck_dim=netF.in_features,
+                                       bias=args.classifier_bias,
+                                       temp=args.angular_temp)
     
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
@@ -329,15 +337,7 @@ def train_source(args):
             with torch.no_grad():
                 f3 = netF(inputs_source3)
                 b3 = netB(f3)
-                if args.angular_logit:
-                    b3 = F.normalize(b3, dim=1)
-                    if args.dataparallel:
-                        w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1).cuda()
-                    else:
-                        w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1).cuda()
-                    c3 = torch.matmul(b3, w_norm) / args.angular_temp
-                else:
-                    c3 = netC(b3)
+                c3 = netC(b3)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
         f1, f2 = netF(inputs_source1), netF(inputs_source2)
@@ -557,7 +557,6 @@ if __name__ == "__main__":
     parser.add_argument('--cr_weight', type=float, default=0.0)
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
-    parser.add_argument('--angular_logit', action='store_true')
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')

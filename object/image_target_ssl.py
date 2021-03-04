@@ -189,11 +189,11 @@ def train_target(args):
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
                                        bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=args.bottleneck,
-                                       bias=args.classifier_bias)
+                                       bias=args.classifier_bias, temp=args.angular_temp)
     else:
         netB = nn.Identity()
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=netF.in_features,
-                                       bias=args.classifier_bias)
+                                       bias=args.classifier_bias, temp=args.angular_temp)
 
     modelpath = args.output_dir_src + '/source_F.pt'
     netF.load_state_dict(torch.load(modelpath))
@@ -424,15 +424,7 @@ def obtain_label(loader, netF, netH, netB, netC, args):
             labels = data[1]
             inputs = inputs.cuda()
             feas = netB(netF(inputs))
-            if args.angular_logit:
-                feas_norm = F.normalize(feas, dim=1)
-                if args.dataparallel:
-                    w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1)
-                else:
-                    w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1)
-                outputs = torch.matmul(feas_norm, w_norm.cuda()) / args.angular_temp
-            else:
-                outputs = netC(feas)
+            outputs = netC(feas)
             if start_test:
                 all_fea = feas.float().cpu()
                 all_output = outputs.float().cpu()
@@ -517,7 +509,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--bottleneck', type=int, default=256)
     parser.add_argument('--epsilon', type=float, default=1e-5)
-    parser.add_argument('--layer', type=str, default="wn", choices=["linear", "wn"])
+    parser.add_argument('--layer', type=str, default="wn", choices=["linear", "wn", "angular"])
     parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--distance', type=str, default='cosine', choices=["euclidean", "cosine"])
@@ -532,7 +524,6 @@ if __name__ == "__main__":
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
     parser.add_argument('--cr_threshold', type=float, default=1.0)
-    parser.add_argument('--angular_logit', action='store_true')
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=0.07)

@@ -104,18 +104,27 @@ class feat_bootleneck(nn.Module):
         return x
 
 class feat_classifier(nn.Module):
-    def __init__(self, class_num, bottleneck_dim=256, type="linear", bias=True):
+    def __init__(self, class_num, bottleneck_dim=256, type="linear", bias=True, temp=0.1):
         super(feat_classifier, self).__init__()
         self.type = type
         if type == 'wn':
             self.fc = weightNorm(nn.Linear(bottleneck_dim, class_num, bias=bias), name="weight")
             self.fc.apply(init_weights)
+        elif type == 'angular':
+            self.fc = nn.Linear(bottleneck_dim, class_num, bias=False)
+            self.fc.apply(init_weights)
+            self.temp = temp
         else:
             self.fc = nn.Linear(bottleneck_dim, class_num, bias=bias)
             self.fc.apply(init_weights)
 
     def forward(self, x):
-        x = self.fc(x)
+        if self.type == 'angular':
+            x = F.normalize(x, dim=1)
+            x = self.fc(x) / self.temp
+            x /= torch.linalg.norm(self.fc.weight, ord=2, dim=1)
+        else:
+            x = self.fc(x)
         return x
     
     
