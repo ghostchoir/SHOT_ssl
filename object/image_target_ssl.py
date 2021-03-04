@@ -425,11 +425,13 @@ def obtain_label(loader, netF, netH, netB, netC, args):
             inputs = inputs.cuda()
             feas = netB(netF(inputs))
             if args.angular_logit:
-                cos = nn.CosineSimilarity(dim=1)
+                feas_norm = F.normalize(feas, dim=1)
                 if args.dataparallel:
-                    outputs = cos(feas, netC.module.fc.weight)
+                    w_norm = F.normalize(netC.module.weight, dim=1).transpose(0,1)
+                    outputs = torch.matmul(feas_norm, w_norm)
                 else:
-                    outputs = cos(feas, netC.fc.weight)
+                    w_norm = F.normalize(netC.weight, dim=1).transpose(0, 1)
+                    outputs = torch.matmul(feas_norm, w_norm)
             else:
                 outputs = netC(feas)
             if start_test:
