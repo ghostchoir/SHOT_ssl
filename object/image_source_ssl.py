@@ -329,14 +329,30 @@ def train_source(args):
             with torch.no_grad():
                 f3 = netF(inputs_source3)
                 b3 = netB(f3)
-                c3 = netC(b3)
+                if args.angular_logit:
+                    b_norm = F.normalize(b3, dim=1)
+                    if args.dataparallel:
+                        w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1)
+                    else:
+                        w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1)
+                    c3 = torch.matmul(b_norm, w_norm.cuda()) / args.angular_temp
+                else:
+                    c3 = netC(b3)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
         f1, f2 = netF(inputs_source1), netF(inputs_source2)
 
         b1, b2 = netB(f1), netB(f2)
 
-        outputs_source = netC(b1)
+        if args.angular_logit:
+            b_norm = F.normalize(b1, dim=1)
+            if args.dataparallel:
+                w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1)
+            else:
+                w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1)
+            outputs_source = torch.matmul(b_norm, w_norm.cuda()) / args.angular_temp
+        else:
+            outputs_source = netC(b1)
 
         if args.ssl_before_btn:
             z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
@@ -541,6 +557,8 @@ if __name__ == "__main__":
     parser.add_argument('--cr_weight', type=float, default=0.0)
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
+    parser.add_argument('--angular_logit', action='store_true')
+    parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')
