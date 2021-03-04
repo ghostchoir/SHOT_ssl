@@ -427,10 +427,10 @@ def obtain_label(loader, netF, netH, netB, netC, args):
             if args.angular_logit:
                 feas_norm = F.normalize(feas, dim=1)
                 if args.dataparallel:
-                    w_norm = F.normalize(netC.module.weight, dim=1).transpose(0,1)
+                    w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0,1)
                     outputs = torch.matmul(feas_norm, w_norm)
                 else:
-                    w_norm = F.normalize(netC.weight, dim=1).transpose(0, 1)
+                    w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1)
                     outputs = torch.matmul(feas_norm, w_norm)
             else:
                 outputs = netC(feas)
