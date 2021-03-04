@@ -330,12 +330,12 @@ def train_source(args):
                 f3 = netF(inputs_source3)
                 b3 = netB(f3)
                 if args.angular_logit:
-                    b_norm = F.normalize(b3, dim=1)
+                    b3 = F.normalize(b3, dim=1)
                     if args.dataparallel:
-                        w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1)
+                        w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1).cuda()
                     else:
-                        w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1)
-                    c3 = torch.matmul(b_norm, w_norm.cuda()) / args.angular_temp
+                        w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1).cuda()
+                    c3 = torch.matmul(b3, w_norm) / args.angular_temp
                 else:
                     c3 = netC(b3)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
@@ -345,12 +345,12 @@ def train_source(args):
         b1, b2 = netB(f1), netB(f2)
 
         if args.angular_logit:
-            b_norm = F.normalize(b1, dim=1)
+            b1 = F.normalize(b1, dim=1)
             if args.dataparallel:
-                w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1)
+                w_norm = F.normalize(netC.module.fc.weight, dim=1).transpose(0, 1).cuda()
             else:
-                w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1)
-            outputs_source = torch.matmul(b_norm, w_norm.cuda()) / args.angular_temp
+                w_norm = F.normalize(netC.fc.weight, dim=1).transpose(0, 1).cuda()
+            outputs_source = torch.matmul(b1, w_norm) / args.angular_temp
         else:
             outputs_source = netC(b1)
 
