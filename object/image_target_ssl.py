@@ -427,9 +427,9 @@ def obtain_label(loader, netF, netH, netB, netC, args):
             if args.angular_logit:
                 cos = nn.CosineSimilarity(dim=1)
                 if args.dataparallel:
-                    outputs = cos(feas, netC.module.weight)
+                    outputs = cos(feas, netC.module.fc.weight)
                 else:
-                    outputs = cos(feas, netC.weight)
+                    outputs = cos(feas, netC.fc.weight)
             else:
                 outputs = netC(feas)
             if start_test:
