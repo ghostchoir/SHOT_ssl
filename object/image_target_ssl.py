@@ -499,8 +499,8 @@ if __name__ == "__main__":
     parser.add_argument('--nopretrained', action='store_true')
     parser.add_argument('--seed', type=int, default=2020, help="random seed")
 
-    parser.add_argument('--gent', action='store_true')
-    parser.add_argument('--ent', action='store_true')
+    parser.add_argument('--nogent', action='store_true')
+    parser.add_argument('--noent', action='store_true')
     parser.add_argument('--threshold', type=int, default=0)
     parser.add_argument('--cls_par', type=float, default=0.3)
     parser.add_argument('--ent_par', type=float, default=1.0)
@@ -548,6 +548,8 @@ if __name__ == "__main__":
     args.grayscale = not args.nograyscale
     args.gaussblur = not args.nogaussblur
     args.classifier_bias = not args.classifier_bias_off
+    args.ent = not args.noent
+    args.gent = not args.nogent
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']
