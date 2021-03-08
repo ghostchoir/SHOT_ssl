@@ -499,8 +499,8 @@ if __name__ == "__main__":
     parser.add_argument('--nopretrained', action='store_true')
     parser.add_argument('--seed', type=int, default=2020, help="random seed")
 
-    parser.add_argument('--gent', type=bool, default=True)
-    parser.add_argument('--ent', type=bool, default=True)
+    parser.add_argument('--gent', action='store_true')
+    parser.add_argument('--ent', action='store_true')
     parser.add_argument('--threshold', type=int, default=0)
     parser.add_argument('--cls_par', type=float, default=0.3)
     parser.add_argument('--ent_par', type=float, default=1.0)
