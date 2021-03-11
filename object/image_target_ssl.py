@@ -285,7 +285,7 @@ def train_target(args):
         inputs_test1, inputs_test2 = inputs_test[0].cuda(), inputs_test[1].cuda()
 
         iter_num += 1
-        lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma)
+        lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
 
         if args.cr_weight > 0:
             inputs_test3 = inputs_test[2].cuda()
@@ -488,6 +488,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
     parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
     parser.add_argument('--gamma', type=float, default=10)
+    parser.add_argument('--power', type=float, default=0.75)
     parser.add_argument('--warmup_ratio', type=float, default=0.1)
     parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
     parser.add_argument('--worker', type=int, default=4, help="number of workers")
