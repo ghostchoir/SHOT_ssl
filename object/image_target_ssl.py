@@ -36,7 +36,7 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
             decay = np.cos((iter_num - warmup_iter) * np.pi / (2 * (max_iter - warmup_iter)))
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr0'] * decay
-        param_group['weight_decay'] = 1e-3
+        param_group['weight_decay'] = args.weight_decay
         param_group['momentum'] = 0.9
         param_group['nesterov'] = True
     return optimizer
@@ -489,6 +489,7 @@ if __name__ == "__main__":
     parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
     parser.add_argument('--gamma', type=float, default=10)
     parser.add_argument('--power', type=float, default=0.75)
+    parser.add_argument('--weight_decay', type=float, default=1e-3)
     parser.add_argument('--warmup_ratio', type=float, default=0.1)
     parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
     parser.add_argument('--worker', type=int, default=4, help="number of workers")
