@@ -435,38 +435,44 @@ def obtain_label(loader, netF, netH, netB, netC, args):
                 all_output = torch.cat((all_output, outputs.float().cpu()), 0)
                 all_label = torch.cat((all_label, labels.float()), 0)
 
-    all_output = nn.Softmax(dim=1)(all_output)
-    ent = torch.sum(-all_output * torch.log(all_output + args.epsilon), dim=1)
-    unknown_weight = 1 - ent / np.log(args.class_num)
-    conf, predict = torch.max(all_output, 1)
-    # print('predict', predict.size())
+    if args.pl_type == 'naive':
+        all_output = nn.Softmax(dim=1)(all_output)
+        conf, predict = torch.max(all_output, 1)
+        accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
+        pred_label = torch.squeeze(predict).numpy()
+    else:
+        all_output = nn.Softmax(dim=1)(all_output)
+        ent = torch.sum(-all_output * torch.log(all_output + args.epsilon), dim=1)
+        unknown_weight = 1 - ent / np.log(args.class_num)
+        conf, predict = torch.max(all_output, 1)
+        # print('predict', predict.size())
 
-    accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
-    if args.distance == 'cosine':
-        all_fea = torch.cat((all_fea, torch.ones(all_fea.size(0), 1)), 1)
-        all_fea = (all_fea.t() / torch.norm(all_fea, p=2, dim=1)).t()
+        accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
+        if args.distance == 'cosine':
+            all_fea = torch.cat((all_fea, torch.ones(all_fea.size(0), 1)), 1)
+            all_fea = (all_fea.t() / torch.norm(all_fea, p=2, dim=1)).t()
 
-    all_fea = all_fea.float().cpu().numpy()
-    K = all_output.size(1)
-    aff = all_output.float().cpu().numpy()
-    initc = aff.transpose().dot(all_fea)
-    initc = initc / (1e-8 + aff.sum(axis=0)[:, None])
-    cls_count = np.eye(K)[predict].sum(axis=0)
-    labelset = np.where(cls_count > args.threshold)
-    labelset = labelset[0]
-    # print(labelset)
-
-    dd = cdist(all_fea, initc[labelset], args.distance)
-    pred_label = dd.argmin(axis=1)
-    pred_label = labelset[pred_label]
-
-    for round in range(1):
-        aff = np.eye(K)[pred_label]
+        all_fea = all_fea.float().cpu().numpy()
+        K = all_output.size(1)
+        aff = all_output.float().cpu().numpy()
         initc = aff.transpose().dot(all_fea)
         initc = initc / (1e-8 + aff.sum(axis=0)[:, None])
+        cls_count = np.eye(K)[predict].sum(axis=0)
+        labelset = np.where(cls_count > args.threshold)
+        labelset = labelset[0]
+        # print(labelset)
+
         dd = cdist(all_fea, initc[labelset], args.distance)
         pred_label = dd.argmin(axis=1)
         pred_label = labelset[pred_label]
+
+        for round in range(1):
+            aff = np.eye(K)[pred_label]
+            initc = aff.transpose().dot(all_fea)
+            initc = initc / (1e-8 + aff.sum(axis=0)[:, None])
+            dd = cdist(all_fea, initc[labelset], args.distance)
+            pred_label = dd.argmin(axis=1)
+            pred_label = labelset[pred_label]
 
     acc = np.sum(pred_label == all_label.float().numpy()) / len(all_fea)
     log_str = 'Accuracy = {:.2f}% -> {:.2f}%'.format(accuracy * 100, acc * 100)
@@ -516,6 +522,7 @@ if __name__ == "__main__":
     parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--distance', type=str, default='cosine', choices=["euclidean", "cosine"])
+    parser.add_argument('--pl_type', type=str, default="sspl", choices=["naive", "sspl"])
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--output_src', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda'])
