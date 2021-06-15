@@ -450,7 +450,6 @@ def test_target(args):
     if args.net[0:3] == 'res':
         if '26' in args.net:
             netF = network.ResCifarBase(26, norm_layer=norm_layer)
-            args.bottleneck = netF.in_features // 2
         else:
             netF = network.ResBase(res_name=args.net)
     elif args.net[0:3] == 'vgg':
