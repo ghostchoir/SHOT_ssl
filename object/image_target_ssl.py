@@ -444,7 +444,7 @@ def obtain_label(loader, netF, netH, netB, netC, args):
         if args.pl_weight_term == 'softmax':
             all_output = nn.Softmax(dim=1)(all_output)
         else:
-            all_output = all_output / torch.norm(all_output, p=2, dim=1)
+            all_output = F.normalize(all_output, p=2, dim=1)
         ent = torch.sum(-all_output * torch.log(all_output + args.epsilon), dim=1)
         unknown_weight = 1 - ent / np.log(args.class_num)
         conf, predict = torch.max(all_output, 1)
