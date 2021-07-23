@@ -131,12 +131,12 @@ def data_load(args):
     
         if args.trte == "val":
             dsize = len(txt_src)
-            tr_size = int(0.9*dsize)
+            tr_size = int(args.split_ratio*dsize)
             # print(dsize, tr_size, dsize - tr_size)
             tr_txt, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
         else:
             dsize = len(txt_src)
-            tr_size = int(0.9*dsize)
+            tr_size = int(args.split_ratio*dsize)
             _, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
             tr_txt = txt_src
             
@@ -521,6 +521,7 @@ if __name__ == "__main__":
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
     parser.add_argument('--s', type=int, default=0, help="source")
     parser.add_argument('--t', type=int, default=1, help="target")
+    parser.add_argument('--split_ratio', type=float, default=0.9)
     parser.add_argument('--max_epoch', type=int, default=20, help="max iterations")
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
     parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
