@@ -441,7 +441,8 @@ def obtain_label(loader, netF, netH, netB, netC, args):
         accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
         pred_label = torch.squeeze(predict).numpy()
     else:
-        all_output = nn.Softmax(dim=1)(all_output)
+        if args.pl_weight_term == 'softmax':
+            all_output = nn.Softmax(dim=1)(all_output)
         ent = torch.sum(-all_output * torch.log(all_output + args.epsilon), dim=1)
         unknown_weight = 1 - ent / np.log(args.class_num)
         conf, predict = torch.max(all_output, 1)
@@ -466,7 +467,7 @@ def obtain_label(loader, netF, netH, netB, netC, args):
         pred_label = dd.argmin(axis=1)
         pred_label = labelset[pred_label]
 
-        for round in range(1):
+        for round in range(args.pl_rounds):
             aff = np.eye(K)[pred_label]
             initc = aff.transpose().dot(all_fea)
             initc = initc / (1e-8 + aff.sum(axis=0)[:, None])
@@ -542,6 +543,8 @@ if __name__ == "__main__":
     parser.add_argument('--norm_feat', action='store_true')
     parser.add_argument('--norm_btn', action='store_true')
     parser.add_argument('--embedding_dim', type=int, default=128)
+    parser.add_argument('--pl_rounds', type=int, default=1)
+    parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive'])
 
     parser.add_argument('--aug_type', type=str, default='simclr')
     parser.add_argument('--aug_strength', type=float, default=1.0)
