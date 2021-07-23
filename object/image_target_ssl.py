@@ -446,7 +446,8 @@ def obtain_label(loader, netF, netH, netB, netC, args):
         elif args.pl_weight_term == 'ls':
             all_output = nn.Softmax(dim=1)(all_output)
             pred = torch.argmax(all_output, dim=1)
-            all_output = torch.ones(all_output.size(0), args.class_num).cuda() * args.pl_smooth / args.class_num
+            all_output = torch.ones(all_output.size(0), args.class_num) * args.pl_smooth / args.class_num
+            all_output = all_output.cuda()
             all_output[range(all_output.size(0)), pred] = (1. - args.pl_smooth) + args.pl_smooth / args.class_num
         else:
             raise NotImplementedError
