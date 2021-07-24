@@ -567,7 +567,7 @@ if __name__ == "__main__":
     parser.add_argument('--pl_rounds', type=int, default=1)
     parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
-    parser.add_argument('--mixed_pl', type=bool, default=False)
+    parser.add_argument('--mixed_pl', action='store_true')
 
     parser.add_argument('--aug_type', type=str, default='simclr')
     parser.add_argument('--aug_strength', type=float, default=1.0)
