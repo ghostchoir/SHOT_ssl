@@ -288,7 +288,13 @@ def train_target(args):
                 mem_label2, mem_conf2 = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
                 dset_loaders['pl'].dataset.transform = trf_backup
                 mem_label2 = torch.from_numpy(mem_label2).cuda()
-                mem_label = (mem_label + mem_label2) / 2
+
+                pls = torch.ones(mem_label.size(0), args.num_class).cuda() * args.cls_smooth / args.num_class
+                pls[range(pls.size(0)), mem_label] = args.mixed_pl_ratio * (1 - args.cls_smooth / 2)
+                pls[range(pls.size(0)), mem_label2] = (1. - args.mixed_pl_ratio) * (1 - args.cls_smooth / 2)
+
+                mem_label = pls
+                mem_conf = (mem_conf + mem_conf2) / 2
             netF.train()
             netH.train()
             netB.train()
@@ -338,13 +344,17 @@ def train_target(args):
             conf_cls = mem_conf[tar_idx]
 
             pred = mem_label[tar_idx]
-            if args.cls_smooth > 0:
-                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
-                    outputs_test[conf_cls >= args.conf_threshold],
-                    pred[conf_cls >= args.conf_threshold])
+            if args.mixed_pl:
+                classifier_loss = nn.BCEWithLogitsLoss()(outputs_test[conf_cls >= args.conf_threshold],
+                                                         pred[conf_cls >= args.conf_threshold])
             else:
-                classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf_cls >= args.conf_threshold],
-                                                        pred[conf_cls >= args.conf_threshold])
+                if args.cls_smooth > 0:
+                    classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
+                        outputs_test[conf_cls >= args.conf_threshold],
+                        pred[conf_cls >= args.conf_threshold])
+                else:
+                    classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf_cls >= args.conf_threshold],
+                                                            pred[conf_cls >= args.conf_threshold])
             classifier_loss *= args.cls_par
             if iter_num < interval_iter and args.dset == "visda-c":
                 classifier_loss *= 0
@@ -571,6 +581,7 @@ if __name__ == "__main__":
     parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
     parser.add_argument('--mixed_pl', action='store_true')
+    parser.add_argument('--mixed_pl_ratio', type=float, default=0.7)
 
     parser.add_argument('--aug_type', type=str, default='simclr')
     parser.add_argument('--aug_strength', type=float, default=1.0)
