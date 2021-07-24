@@ -289,7 +289,7 @@ def train_target(args):
                 dset_loaders['pl'].dataset.transform = trf_backup
                 mem_label2 = torch.from_numpy(mem_label2).cuda()
 
-                pls = torch.ones(mem_label.size(0), args.num_class).cuda() * args.cls_smooth / args.num_class
+                pls = torch.ones(mem_label.size(0), args.class_num).cuda() * args.cls_smooth / args.class_num
                 pls[range(pls.size(0)), mem_label] = args.mixed_pl_ratio * (1 - args.cls_smooth / 2)
                 pls[range(pls.size(0)), mem_label2] = (1. - args.mixed_pl_ratio) * (1 - args.cls_smooth / 2)
 
