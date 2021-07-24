@@ -376,7 +376,11 @@ def train_target(args):
                 ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
                 z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
-                ssl_loss = ssl_loss_fn(z, mem_label[tar_idx])
+                if args.mixed_pl:
+                    pl = torch.argmax(mem_label[tar_idx], dim=1)
+                else:
+                    pl = mem_label[tar_idx]
+                ssl_loss = ssl_loss_fn(z, pl)
         else:
             ssl_loss = torch.tensor(0.0).cuda()
 
