@@ -336,7 +336,7 @@ def train_target(args):
 
             pred = mem_label[tar_idx]
             if args.cls_smooth > 0:
-                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(
+                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
                     outputs_test[conf_cls >= args.conf_threshold],
                     pred[conf_cls >= args.conf_threshold])
             else:
