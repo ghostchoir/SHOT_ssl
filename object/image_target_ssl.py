@@ -12,7 +12,7 @@ import network, loss
 from torch.utils.data import DataLoader
 from data_list import ImageList, ImageList_idx, CIFAR10_idx
 from data import *
-from loss import NTXentLoss, SupConLoss
+from loss import NTXentLoss, SupConLoss, CrossEntropyLabelSmooth
 import random, pdb, math, copy
 from tqdm import tqdm
 from scipy.spatial.distance import cdist
@@ -278,6 +278,14 @@ def train_target(args):
             netB.eval()
             mem_label, mem_conf = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
+
+            if args.mixed_pl:
+                trf_backup = dset_loaders['pl'].dataset.transform
+                dset_loaders['pl'].dataset.transform = image_train(args)
+                mem_label2, mem_conf2 = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
+                dset_loaders['pl'].dataset.transform = trf_backup
+                mem_label2 = torch.from_numpy(mem_label2).cuda()
+                mem_label = (mem_label + mem_label2) / 2
             netF.train()
             netH.train()
             netB.train()
@@ -327,8 +335,13 @@ def train_target(args):
             conf_cls = mem_conf[tar_idx]
 
             pred = mem_label[tar_idx]
-            classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf_cls >= args.conf_threshold],
-                                                    pred[conf_cls >= args.conf_threshold])
+            if args.cls_smooth > 0:
+                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(
+                    outputs_test[conf_cls >= args.conf_threshold],
+                    pred[conf_cls >= args.conf_threshold])
+            else:
+                classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf_cls >= args.conf_threshold],
+                                                        pred[conf_cls >= args.conf_threshold])
             classifier_loss *= args.cls_par
             if iter_num < interval_iter and args.dset == "visda-c":
                 classifier_loss *= 0
@@ -520,6 +533,7 @@ if __name__ == "__main__":
     parser.add_argument('--noent', action='store_true')
     parser.add_argument('--threshold', type=int, default=0)
     parser.add_argument('--cls_par', type=float, default=0.3)
+    parser.add_argument('--cls_smooth', type=float, default=0)
     parser.add_argument('--ent_par', type=float, default=1.0)
     parser.add_argument('--lr_decay1', type=float, default=0.1)
     parser.add_argument('--lr_decay2', type=float, default=1.0)
@@ -553,6 +567,7 @@ if __name__ == "__main__":
     parser.add_argument('--pl_rounds', type=int, default=1)
     parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
+    parser.add_argument('--mixed_pl', type=bool, default=False)
 
     parser.add_argument('--aug_type', type=str, default='simclr')
     parser.add_argument('--aug_strength', type=float, default=1.0)
@@ -571,6 +586,8 @@ if __name__ == "__main__":
     args.classifier_bias = not args.classifier_bias_off
     args.ent = not args.noent
     args.gent = not args.nogent
+
+    assert not (args.mixed_pl and args.noisy_pl)
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']
