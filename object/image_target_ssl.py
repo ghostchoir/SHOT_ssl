@@ -466,15 +466,15 @@ def obtain_label(loader, netF, netH, netB, netC, args):
                 all_label = torch.cat((all_label, labels.float()), 0)
 
     if args.pl_type == 'naive':
-        all_output = nn.Softmax(dim=1)(all_output)
+        all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
         conf, predict = torch.max(all_output, 1)
         accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
         pred_label = torch.squeeze(predict).numpy()
     else:
         if args.pl_weight_term == 'softmax':
-            all_output = nn.Softmax(dim=1)(all_output)
+            all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
         elif args.pl_weight_term == 'ls':
-            all_output = nn.Softmax(dim=1)(all_output)
+            all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
             pred = torch.argmax(all_output, dim=1)
             all_output = torch.ones(all_output.size(0), args.class_num) * args.pl_smooth / args.class_num
             all_output[range(all_output.size(0)), pred] = (1. - args.pl_smooth) + args.pl_smooth / args.class_num
@@ -584,6 +584,7 @@ if __name__ == "__main__":
     parser.add_argument('--pl_rounds', type=int, default=1)
     parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
+    parser.add_argument('--pl_temperature', type=float, default=1.0)
     parser.add_argument('--mixed_pl', action='store_true')
     parser.add_argument('--mixed_pl_ratio', type=float, default=0.7)
 
