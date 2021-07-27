@@ -304,7 +304,7 @@ def train_source(args):
     elif args.ssl_task == 'supcon':
         ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
     elif args.ssl_task == 'ls_supcon':
-        ssl_loss_fn = LabelSmoothedSCLLoss(args.batch_size, args.temperature, args.num_class, args.ssl_smooth)
+        ssl_loss_fn = LabelSmoothedSCLLoss(args.batch_size, args.temperature, args.class_num, args.ssl_smooth)
 
     if args.cr_weight > 0:
         if args.cr_metric == 'cos':
