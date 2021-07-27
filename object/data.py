@@ -184,7 +184,7 @@ def cifar_train(args):
     if args.norm_img:
         trfs.append(normalize)
     
-    if args.ssl_task in ['simclr', 'supcon']:
+    if args.ssl_task in ['simclr', 'supcon', 'ls_supcon']:
         return DuplicatedCompose(trfs)
     else:
         return transforms.Compose(trfs)
@@ -321,7 +321,7 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
     if args.norm_img:
         trfs.append(normalize)
     
-    if args.ssl_task in ['simclr', 'supcon']:
+    if args.ssl_task in ['simclr', 'supcon', 'ls_supcon']:
         return DuplicatedCompose(trfs)
     else:
         return transforms.Compose(trfs)
