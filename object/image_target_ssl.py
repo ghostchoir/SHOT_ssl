@@ -388,7 +388,7 @@ def train_target(args):
                     pl = torch.argmax(mem_label[tar_idx], dim=1)
                 else:
                     pl = mem_label[tar_idx]
-                ssl_loss = ssl_loss_fn(z1, z2, pl)
+                ssl_loss = ssl_loss_fn(z1, z2, pl).squeeze()
         else:
             ssl_loss = torch.tensor(0.0).cuda()
 
