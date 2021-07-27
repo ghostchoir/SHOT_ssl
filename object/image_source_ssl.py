@@ -14,7 +14,7 @@ from data_list import ImageList
 from data import *
 import random, pdb, math, copy
 from tqdm import tqdm
-from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss
+from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss, LabelSmoothedSCLLoss
 from scipy.spatial.distance import cdist
 from sklearn.metrics import confusion_matrix
 from sklearn.cluster import KMeans
@@ -303,6 +303,8 @@ def train_source(args):
         ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
     elif args.ssl_task == 'supcon':
         ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
+    elif args.ssl_task == 'ls_supcon':
+        ssl_loss_fn = LabelSmoothedSCLLoss(args.batch_size, args.temperature, args.num_class, args.ssl_smooth)
 
     if args.cr_weight > 0:
         if args.cr_metric == 'cos':
@@ -370,11 +372,13 @@ def train_source(args):
             classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(outputs_source, labels_source)
             
         if args.ssl_weight != 0:
-            if args.ssl_task == 'simclr':
+            if args.ssl_task in 'simclr':
                 ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
                 z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
                 ssl_loss = ssl_loss_fn(z, labels=labels_source)
+            elif args.ssl_task == 'ls_supcon':
+                ssl_loss = ssl_loss_fn(z1, z2, labels_source)
         else:
             ssl_loss = torch.tensor(0.0).cuda()
 
@@ -545,7 +549,8 @@ if __name__ == "__main__":
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda', 'oda'])
     parser.add_argument('--trte', type=str, default='val', choices=['full', 'val'])
-    parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr', 'supcon'])
+    parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr', 'supcon', 'ls_supcon'])
+    parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2'])

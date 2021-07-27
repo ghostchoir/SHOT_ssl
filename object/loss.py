@@ -236,3 +236,66 @@ class SupConLoss(nn.Module):
         loss = loss.view(anchor_count, batch_size).mean()
 
         return loss
+
+
+class LabelSmoothedSCLLoss(torch.nn.Module):
+    def __init__(self, batch_size, temperature, n_classes, epsilon=1e-2, distributed=False):
+        super(LabelSmoothedSCLLoss, self).__init__()
+        self.batch_size = batch_size
+        self.temperature = temperature
+        self.n_c = n_classes
+        self.epsilon = epsilon
+        self.similarity = torch.nn.CosineSimilarity(dim=-1)
+
+        self.non_blocking = distributed
+
+        self.mask_samples_from_same_repr = self._get_correlated_mask().type(torch.bool)
+
+        self.eye = (1 - torch.eye(2 * self.batch_size)).bool().cuda(non_blocking=self.non_blocking)
+        self.label_indicator = torch.zeros((2 * self.batch_size, 2 * self.batch_size)).bool().cuda(
+            non_blocking=self.non_blocking)
+        self.normalizer = torch.zeros(2 * self.batch_size).cuda(non_blocking=self.non_blocking)
+
+    def _get_correlated_mask(self):
+        diag = np.eye(2 * self.batch_size)
+        l1 = np.eye((2 * self.batch_size), 2 * self.batch_size, k=-self.batch_size)
+        l2 = np.eye((2 * self.batch_size), 2 * self.batch_size, k=self.batch_size)
+        mask = torch.from_numpy((diag + l1 + l2))
+        mask = (1 - mask).type(torch.bool)
+
+        return mask.cuda(non_blocking=self.non_blocking)
+
+    def forward(self, zis, zjs, targets):
+
+        if len(targets.size()) == 2:
+            targets = torch.argmax(targets, dim=1, keepdim=False)
+
+        loss = torch.Tensor([0.]).cuda(non_blocking=self.non_blocking)
+
+        labels, label_counts = torch.unique(targets, False, return_counts=True)
+        target = torch.cat([targets, targets], dim=0)
+
+        self.label_indicator.fill_(0.0)
+
+        for i in range(2 * self.batch_size):
+            self.label_indicator[i] = (target == target[i])
+            self.normalizer[i] = label_counts[(labels == target[i])]
+
+        self.label_indicator = self.label_indicator * self.eye
+
+        representations = torch.cat([zis, zjs], dim=0)
+
+        similarity_matrix = torch.exp(
+            self.similarity(representations.unsqueeze(1), representations.unsqueeze(0)) / self.temperature)
+
+        positives = similarity_matrix
+        negatives = similarity_matrix[self.mask_samples_from_same_repr].view(2 * self.batch_size, -1).sum(-1)
+
+        for i in range(2 * self.batch_size):
+            logit = self.epsilon * torch.log(positives[i] / negatives[i]).sum(-1) + \
+                    (1 - self.n_c * self.epsilon) * torch.log(positives[i][self.label_indicator[i]] / negatives[i]).sum(
+                -1)
+            loss += (-logit / (2 * self.normalizer[i] - 1))
+
+        loss /= (2 * self.batch_size)
+        return loss
