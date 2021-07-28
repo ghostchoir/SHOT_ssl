@@ -252,6 +252,8 @@ def train_target(args):
             dist = nn.PairwiseDistance(p=1)
         elif args.cr_metric == 'l2':
             dist = nn.PairwiseDistance(p=2)
+        elif args.cr_metric == 'bce':
+            dist = nn.BCEWithLogitsLoss(reduction='sum').cuda()
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
@@ -581,7 +583,7 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
-    parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2'])
+    parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
     parser.add_argument('--cr_threshold', type=float, default=1.0)
     parser.add_argument('--angular_temp', type=float, default=0.1)
