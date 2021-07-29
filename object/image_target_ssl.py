@@ -375,7 +375,7 @@ def train_target(args):
             im_loss = entropy_loss * args.ent_par
             classifier_loss += im_loss
 
-        if args.ssl_weight != 0:
+        if args.ssl_weight > 0:
             if args.ssl_task == 'simclr':
                 ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
@@ -391,8 +391,7 @@ def train_target(args):
                 else:
                     pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z1, z2, pl).squeeze()
-        else:
-            ssl_loss = torch.tensor(0.0).cuda()
+            classifier_loss += args.ssl_weight * ssl_loss
 
         if args.cr_weight > 0:
             try:
@@ -402,11 +401,7 @@ def train_target(args):
                     cr_loss *= -1
             except:
                 cr_loss = torch.tensor(0.0).cuda()
-        else:
-            cr_loss = torch.tensor(0.0).cuda()
-
-        classifier_loss += args.ssl_weight * ssl_loss
-        classifier_loss += args.cr_weight * cr_loss
+            classifier_loss += args.cr_weight * cr_loss
 
         optimizer.zero_grad()
         classifier_loss.backward()
