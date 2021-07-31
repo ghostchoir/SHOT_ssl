@@ -311,10 +311,12 @@ def train_source(args):
             dist = nn.CosineSimilarity(dim=1).cuda()
         elif args.cr_metric == 'l1':
             dist = nn.PairwiseDistance(p=1).cuda()
-        elif args.cr_meric == 'l2':
+        elif args.cr_metric == 'l2':
             dist = nn.PairwiseDistance(p=2).cuda()
         elif args.cr_metric == 'bce':
             dist = nn.BCEWithLogitsLoss(reduction='sum').cuda()
+        elif args.cr_metric == 'kl':
+            dist = nn.KLDivLoss(reduction='sum').cuda()
 
     while iter_num < max_iter:
         try:
@@ -555,7 +557,7 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
-    parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce'])
+    parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce', 'kl'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
