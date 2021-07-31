@@ -340,6 +340,9 @@ def train_target(args):
             elif args.cr_site == 'cls':
                 f_hard = outputs_test
                 f_weak = c3
+                if args.cr_metric != 'cos':
+                    f_hard = F.softmax(f_hard, dim=-1)
+                    f_weak = F.softmax(f_weak, dim=-1)
             else:
                 raise NotImplementedError
 
