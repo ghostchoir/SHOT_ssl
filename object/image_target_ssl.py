@@ -460,8 +460,12 @@ def obtain_label(loader, netF, netH, netB, netC, args):
         for _ in range(len(loader)):
             data = iter_test.next()
 
-            inputs = data[0]
-            labels = data[1]
+            if args.noisy_pl:
+                inputs = data[0][0]
+                labels = data[1]
+            else:
+                inputs = data[0]
+                labels = data[1]
             inputs = inputs.cuda()
             feas = netB(netF(inputs))
             outputs = netC(feas)
