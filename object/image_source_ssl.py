@@ -25,6 +25,15 @@ corruptions = ['gaussian_noise', 'shot_noise', 'impulse_noise', 'defocus_blur', 
                'brightness', 'contrast', 'elastic_transform', 'pixelate', 'jpeg_compression']
 
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 def op_copy(optimizer):
     for param_group in optimizer.param_groups:
         param_group['lr0'] = param_group['lr']
@@ -149,19 +158,14 @@ def data_load(args):
 
     return dset_loaders
 
-def cal_acc(loader, netF, netH, netB, netC, flag=False):
+def cal_acc(loader, netF, netH, netB, netC, args, flag=False):
     start_test = True
     with torch.no_grad():
         iter_test = iter(loader)
         for i in range(len(loader)):
             data = iter_test.next()
-            
-            if len(data) == 3:
-                inputs = data[0]
-                labels = data[2]
-            else:
-                inputs = data[0]
-                labels = data[1]
+            inputs = data[0]
+            labels = data[-1]
             inputs = inputs.cuda()
             outputs = netC(netB(netF(inputs)))
             if start_test:
@@ -335,10 +339,20 @@ def train_source(args):
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter)
 
-        inputs_source1, inputs_source2, labels_source = inputs_source[0].cuda(), inputs_source[1].cuda(), labels_source.cuda()
+        if args.duplicated:
+            inputs_source1, inputs_source2, labels_source = inputs_source[0].cuda(), inputs_source[1].cuda(), labels_source.cuda()
+            f1, f2 = netF(inputs_source1), netF(inputs_source2)
+            b1, b2 = netB(f1), netB(f2)
+        else:
+            if args.cr_weight > 0:
+                inputs_source, labels_source = inputs_source[0].cuda(), labels_source.cuda()
+            else:
+                inputs_source, labels_source = inputs_source.cuda(), labels_source.cuda()
+            f1 = netF(inputs_source)
+            b1 = netB(f1)
 
         if args.cr_weight > 0:
-            inputs_source3 = inputs_source[2].cuda()
+            inputs_source3 = inputs_source[-1].cuda()
 
             with torch.no_grad():
                 f3 = netF(inputs_source3)
@@ -346,16 +360,7 @@ def train_source(args):
                 c3 = netC(b3)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
-        f1, f2 = netF(inputs_source1), netF(inputs_source2)
-
-        b1, b2 = netB(f1), netB(f2)
-
         outputs_source = netC(b1)
-
-        if args.ssl_before_btn:
-            z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-        else:
-            z1, z2 = netH(b1, args.norm_feat), netH(b2, args.norm_feat)
 
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
@@ -378,7 +383,12 @@ def train_source(args):
         else:
             classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(outputs_source, labels_source)
             
-        if args.ssl_weight != 0:
+        if args.ssl_weight > 0:
+            if args.ssl_before_btn:
+                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+            else:
+                z1, z2 = netH(b1, args.norm_feat), netH(b2, args.norm_feat)
+
             if args.ssl_task in 'simclr':
                 ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
@@ -390,13 +400,13 @@ def train_source(args):
             ssl_loss = torch.tensor(0.0).cuda()
 
         if args.cr_weight > 0:
-
             try:
                 cr_loss = dist(f_hard[conf<=args.cr_threshold], f_weak[conf<=args.cr_threshold]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
             except:
+                print('Error computing CR loss')
                 cr_loss = torch.tensor(0.0).cuda()
         else:
             cr_loss = torch.tensor(0.0).cuda()
@@ -413,10 +423,10 @@ def train_source(args):
             netB.eval()
             netC.eval()
             if args.dset=='visda-c':
-                acc_s_te, acc_list = cal_acc(dset_loaders['source_te'], netF, netH, netB, netC, True)
+                acc_s_te, acc_list = cal_acc(dset_loaders['source_te'], netF, netH, netB, netC, args, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name_src, iter_num, max_iter, acc_s_te) + '\n' + acc_list
             else:
-                acc_s_te, _ = cal_acc(dset_loaders['source_te'], netF, netH, netB, netC, False)
+                acc_s_te, _ = cal_acc(dset_loaders['source_te'], netF, netH, netB, netC, args, False)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name_src, iter_num, max_iter, acc_s_te)
             args.out_file.write(log_str + '\n')
             args.out_file.flush()
@@ -574,6 +584,7 @@ if __name__ == "__main__":
     parser.add_argument('--nojitter', action='store_true')
     parser.add_argument('--nograyscale', action='store_true')
     parser.add_argument('--nogaussblur', action='store_true')
+    parser.add_argument('--duplicated', default=False, type=str2bool)
     args = parser.parse_args()
     
     args.pretrained = not args.nopretrained
@@ -582,6 +593,9 @@ if __name__ == "__main__":
     args.grayscale = not args.nograyscale
     args.gaussblur = not args.nogaussblur
     args.classifier_bias = not args.classifier_bias_off
+
+    if args.ssl_weight > 0 and args.ssl_task != 'none':
+        args.duplicated = True
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']

@@ -19,6 +19,15 @@ from scipy.spatial.distance import cdist
 from sklearn.metrics import confusion_matrix
 
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 def op_copy(optimizer):
     for param_group in optimizer.param_groups:
         param_group['lr0'] = param_group['lr']
@@ -75,10 +84,16 @@ def data_load(args):
 
         dsets["pl"] = cifar100c_dset_idx(args)
         if args.noisy_pl:
-            ssl_task = args.ssl_task
-            args.ssl_task = 'none'
+            duplicated = args.duplicated
+            aug_type = args.aug_type
+            cr_weight = args.cr_weight
+            args.duplicated = False
+            args.aug_type = 'simclr'
+            args.cr_weight = 0
             dsets["pl"].transform = cifar_train(args)
-            args.ssl_task = ssl_task
+            args.duplicated = duplicated
+            args.aug_type = aug_type
+            args.cr_weight = cr_weight
 
         dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
@@ -114,10 +129,16 @@ def data_load(args):
 
         dsets["pl"] = ImageList_idx(txt_test, transform=image_test(args))
         if args.noisy_pl:
-            ssl_task = args.ssl_task
-            args.ssl_task = 'none'
+            duplicated = args.duplicated
+            aug_type = args.aug_type
+            cr_weight = args.cr_weight
+            args.duplicated = False
+            args.aug_type = 'simclr'
+            args.cr_weight = 0
             dsets["pl"].transform = image_train(args)
-            args.ssl_task = ssl_task
+            args.duplicated = duplicated
+            args.aug_type = aug_type
+            args.cr_weight = cr_weight
 
         dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
@@ -305,13 +326,23 @@ def train_target(args):
             netH.train()
             netB.train()
 
-        inputs_test1, inputs_test2 = inputs_test[0].cuda(), inputs_test[1].cuda()
+        if args.duplicated:
+            inputs_test1, inputs_test2 = inputs_test[0].cuda(), inputs_test[1].cuda()
+            f1, f2 = netF(inputs_test1), netF(inputs_test2)
+            b1, b2 = netB(f1), netB(f2)
+        else:
+            if args.cr_weight > 0:
+                inputs_test = inputs_test[0].cuda()
+            else:
+                inputs_test = inputs_test.cuda()
+            f1 = netF(inputs_test)
+            b1 = netB(f1)
 
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
 
         if args.cr_weight > 0:
-            inputs_test3 = inputs_test[2].cuda()
+            inputs_test3 = inputs_test[-1].cuda()
 
             with torch.no_grad():
                 f3 = netF(inputs_test3)
@@ -319,16 +350,7 @@ def train_target(args):
                 c3 = netC(b3)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
-        f1, f2 = netF(inputs_test1), netF(inputs_test2)
-
-        b1, b2 = netB(f1), netB(f2)
-
         outputs_test = netC(b1)
-
-        if args.ssl_before_btn:
-            z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
-        else:
-            z1, z2 = netH(b1, args.norm_feat), netH(b2, args.norm_feat)
 
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
@@ -381,6 +403,11 @@ def train_target(args):
             classifier_loss += im_loss
 
         if args.ssl_weight > 0:
+            if args.ssl_before_btn:
+                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+            else:
+                z1, z2 = netH(b1, args.norm_feat), netH(b2, args.norm_feat)
+
             if args.ssl_task == 'simclr':
                 ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
@@ -405,6 +432,7 @@ def train_target(args):
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
             except:
+                print('Error computing CR loss')
                 cr_loss = torch.tensor(0.0).cuda()
             classifier_loss += args.cr_weight * cr_loss
 
@@ -610,6 +638,7 @@ if __name__ == "__main__":
     parser.add_argument('--nojitter', action='store_true')
     parser.add_argument('--nograyscale', action='store_true')
     parser.add_argument('--nogaussblur', action='store_true')
+    parser.add_argument('--duplicated', default=False, type=str2bool)
 
     parser.add_argument('--noisy_pl', action='store_true')
     args = parser.parse_args()
@@ -622,6 +651,9 @@ if __name__ == "__main__":
     args.classifier_bias = not args.classifier_bias_off
     args.ent = not args.noent
     args.gent = not args.nogent
+
+    if args.ssl_weight > 0 and args.ssl_task != 'none':
+        args.duplicated = True
 
     assert not (args.mixed_pl and args.noisy_pl)
 

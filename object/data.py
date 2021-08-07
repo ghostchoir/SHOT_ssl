@@ -156,8 +156,10 @@ def cifar_train(args):
             trfs1.append(normalize)
             trfs3.append(normalize)
 
-
-        return TripletCompose(trfs1, trfs2, trfs3)
+        if args.duplicated:
+            return TripletCompose(trfs1, trfs2, trfs3)
+        else:
+            return DualCompose(trfs1, trfs3)
 
     if args.aug_type == 'simclr':
         s = args.aug_strength
@@ -184,7 +186,7 @@ def cifar_train(args):
     if args.norm_img:
         trfs.append(normalize)
     
-    if args.ssl_task in ['simclr', 'supcon', 'ls_supcon']:
+    if args.duplicated:
         return DuplicatedCompose(trfs)
     else:
         return transforms.Compose(trfs)
@@ -294,7 +296,10 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
             trfs1.append(normalize)
             trfs3.append(normalize)
 
-        return TripletCompose(trfs1, trfs2, trfs3)
+        if args.duplicated:
+            return TripletCompose(trfs1, trfs2, trfs3)
+        else:
+            return DualCompose(trfs1, trfs3)
 
     if args.aug_type == 'simclr':
         s = args.aug_strength
@@ -321,7 +326,7 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
     if args.norm_img:
         trfs.append(normalize)
     
-    if args.ssl_task in ['simclr', 'supcon', 'ls_supcon']:
+    if args.duplicated:
         return DuplicatedCompose(trfs)
     else:
         return transforms.Compose(trfs)
