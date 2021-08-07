@@ -308,10 +308,10 @@ def train_target(args):
 
             if args.mixed_pl:
                 trf_backup = dset_loaders['pl'].dataset.transform
-                ssl_task = args.ssl_task
-                args.ssl_task = 'none'
+                aug_type = args.aug_type
+                args.aug_type = 'none'
                 dset_loaders['pl'].dataset.transform = image_train(args)
-                args.ssl_task = ssl_task
+                args.aug_type = aug_type
                 mem_label2, mem_conf2 = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
                 dset_loaders['pl'].dataset.transform = trf_backup
                 mem_label2 = torch.from_numpy(mem_label2).cuda()
@@ -332,10 +332,10 @@ def train_target(args):
             b1, b2 = netB(f1), netB(f2)
         else:
             if args.cr_weight > 0:
-                inputs_test = inputs_test[0].cuda()
+                inputs_test1 = inputs_test[0].cuda()
             else:
-                inputs_test = inputs_test.cuda()
-            f1 = netF(inputs_test)
+                inputs_test1 = inputs_test.cuda()
+            f1 = netF(inputs_test1)
             b1 = netB(f1)
 
         iter_num += 1
