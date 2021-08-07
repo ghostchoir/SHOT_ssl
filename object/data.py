@@ -30,8 +30,9 @@ class DualCompose(object):
     def __call__(self, img):
         img1 = img.copy()
         img2 = img.copy()
-        for t1, t2 in zip(self.trfs1, self.trfs2):
+        for t1 in self.trfs1:
             img1 = t1(img1)
+        for t2 in self.trfs2:
             img2 = t2(img2)
         return img1, img2
 
