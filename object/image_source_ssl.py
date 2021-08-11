@@ -345,10 +345,10 @@ def train_source(args):
             b1, b2 = netB(f1), netB(f2)
         else:
             if args.cr_weight > 0:
-                inputs_source, labels_source = inputs_source[0].cuda(), labels_source.cuda()
+                inputs_source1, labels_source = inputs_source[0].cuda(), labels_source.cuda()
             else:
-                inputs_source, labels_source = inputs_source.cuda(), labels_source.cuda()
-            f1 = netF(inputs_source)
+                inputs_source1, labels_source = inputs_source.cuda(), labels_source.cuda()
+            f1 = netF(inputs_source1)
             b1 = netB(f1)
 
         if args.cr_weight > 0:
