@@ -275,8 +275,11 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
         s = args.aug_strength
         color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
 
-        trfs1 = [
-            transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0)),
+        if args.custom_scale:
+            trfs1 = [transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0))]
+        else:
+            trfs1 = [transforms.RandomResizedCrop(size=crop_size)]
+        trfs1 += [
             transforms.RandomHorizontalFlip(),
             transforms.RandomApply([color_jitter], p=0.8),
             transforms.RandomGrayscale(p=0.2),
@@ -305,8 +308,11 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
     if args.aug_type == 'simclr':
         s = args.aug_strength
         color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
-        trfs = [
-            transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0)),
+        if args.custom_scale:
+            trfs = [transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0))]
+        else:
+            trfs = [transforms.RandomResizedCrop(size=crop_size)]
+        trfs += [
             transforms.RandomHorizontalFlip(),
         ]
         if args.jitter:
