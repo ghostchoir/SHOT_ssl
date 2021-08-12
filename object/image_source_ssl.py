@@ -587,6 +587,7 @@ if __name__ == "__main__":
     parser.add_argument('--nograyscale', action='store_true')
     parser.add_argument('--nogaussblur', action='store_true')
     parser.add_argument('--duplicated', default=False, type=str2bool)
+    parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
     args = parser.parse_args()
     
     args.pretrained = not args.nopretrained
@@ -678,6 +679,15 @@ if __name__ == "__main__":
             args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
     
             if args.dset == 'office-home':
+                if args.disable_aug_for_shape:
+                    if args.s in [1, 2]:
+                        args.jitter = False
+                        args.grayscale = False
+                        args.gaussblur = False
+                    else:
+                        args.jitter = not args.nojitter
+                        args.grayscale = not args.grayscale
+                        args.gaussblur = not args.nogaussblur
                 if args.da == 'pda':
                     args.class_num = 65
                     args.src_classes = [i for i in range(65)]
