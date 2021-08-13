@@ -635,7 +635,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--aug_type', type=str, default='simclr')
     parser.add_argument('--aug_strength', type=float, default=1.0)
-    parser.add_argument('--custom_scale', action='store_true')
+    parser.add_argument('--custom_scale', default=True, type=str2bool)
     parser.add_argument('--nojitter', action='store_true')
     parser.add_argument('--nograyscale', action='store_true')
     parser.add_argument('--nogaussblur', action='store_true')
