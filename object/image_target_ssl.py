@@ -219,7 +219,7 @@ def train_target(args):
     modelpath = args.output_dir_src + '/source_F.pt'
     netF.load_state_dict(torch.load(modelpath))
     modelpath = args.output_dir_src + '/source_H.pt'
-    netH.load_state_dict(torch.load(modelpath))
+    netH.load_state_dict(torch.load(modelpath), strict=False)
     try:
         modelpath = args.output_dir_src + '/source_B.pt'
         netB.load_state_dict(torch.load(modelpath), strict=False)
