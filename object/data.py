@@ -281,11 +281,14 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
             trfs1 = [transforms.RandomResizedCrop(size=crop_size)]
         trfs1 += [
             transforms.RandomHorizontalFlip(),
-            transforms.RandomApply([color_jitter], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
-            GaussianBlur(kernel_size=int(0.1 * crop_size)),
-            transforms.ToTensor(),
         ]
+        if args.jitter:
+            trfs1.append(transforms.RandomApply([color_jitter], p=0.8))
+        if args.grayscale:
+            trfs1.append(transforms.RandomGrayscale(p=0.2))
+        if args.gaussblur:
+            trfs1.append(GaussianBlur(kernel_size=int(0.1 * crop_size)))
+        trfs1.append(transforms.ToTensor())
 
         trfs2 = trfs1
 
