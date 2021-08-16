@@ -582,7 +582,7 @@ if __name__ == "__main__":
     parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
     parser.add_argument('--worker', type=int, default=4, help="number of workers")
     parser.add_argument('--dset', type=str, default='office-home',
-                        choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C'])
+                        choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C', 'image-clef'])
     parser.add_argument('--level', type=int, default=5)
     parser.add_argument('--folder', type=str, default='/SSD/euntae/data/')
     parser.add_argument('--lr', type=float, default=1e-2, help="learning rate")
@@ -677,6 +677,9 @@ if __name__ == "__main__":
     if args.dset == 'CIFAR-100-C':
         names = corruptions
         args.class_num = 100
+    if args.dset == 'image-clef':
+        names = ['b', 'c', 'i', 'p']
+        args.class_num = 12
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
     if len(args.gpu_id) > 1:
