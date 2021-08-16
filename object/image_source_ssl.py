@@ -620,7 +620,7 @@ if __name__ == "__main__":
         names = corruptions
         args.class_num = 100
     if args.dset == 'image-clef':
-        names = ['b', 'c', 'i', 'p']
+        names = ['c', 'i', 'p']
         args.class_num = 12
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
