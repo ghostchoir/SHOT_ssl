@@ -271,75 +271,23 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
     else:
         normalize = Normalize(meanfile='./ilsvrc_2012_mean.npy')
 
-    if args.cr_weight > 0:
-        s = args.aug_strength
-        color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
+    trfs1 = None
+    trfs2 = None
+    trfs3 = None
 
-        if args.custom_scale:
-            trfs1 = [transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0))]
-        else:
-            trfs1 = [transforms.RandomResizedCrop(size=crop_size)]
-        trfs1 += [
-            transforms.RandomHorizontalFlip(),
-        ]
-        if args.jitter:
-            trfs1.append(transforms.RandomApply([color_jitter], p=0.8))
-        if args.grayscale:
-            trfs1.append(transforms.RandomGrayscale(p=0.2))
-        if args.gaussblur:
-            trfs1.append(GaussianBlur(kernel_size=int(0.1 * crop_size)))
-        trfs1.append(transforms.ToTensor())
+    if args.aug1 != 'none':
+        trfs1 = get_image_transform(args.aug1, args)
+    if args.aug2 != 'none':
+        trfs2 = get_image_transform(args.aug2, args)
+    if args.aug3 != 'none':
+        trfs3 = get_image_transform(args.aug3, args)
 
-        trfs2 = trfs1
-
-        trfs3 = [
-            transforms.Resize((resize_size, resize_size)),
-            transforms.RandomCrop(crop_size),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ]
-
-        if args.norm_img:
-            trfs1.append(normalize)
-            trfs3.append(normalize)
-
-        if args.duplicated:
-            return TripletCompose(trfs1, trfs2, trfs3)
-        else:
-            return DualCompose(trfs1, trfs3)
-
-    if args.aug_type == 'simclr':
-        s = args.aug_strength
-        color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
-        if args.custom_scale:
-            trfs = [transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0))]
-        else:
-            trfs = [transforms.RandomResizedCrop(size=crop_size)]
-        trfs += [
-            transforms.RandomHorizontalFlip(),
-        ]
-        if args.jitter:
-            trfs.append(transforms.RandomApply([color_jitter], p=0.8))
-        if args.grayscale:
-            trfs.append(transforms.RandomGrayscale(p=0.2))
-        if args.gaussblur:
-            trfs.append(GaussianBlur(kernel_size=int(0.1 * crop_size)))
-        trfs.append(transforms.ToTensor())
+    if trfs3 is not None:
+        return TripletCompose(trfs1, trfs2, trfs3)
+    elif trfs2 is not None:
+        return DualCompose(trfs1, trfs2)
     else:
-        trfs = [
-            transforms.Resize((resize_size, resize_size)),
-            transforms.RandomCrop(crop_size),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ]
-        
-    if args.norm_img:
-        trfs.append(normalize)
-    
-    if args.duplicated:
-        return DuplicatedCompose(trfs)
-    else:
-        return transforms.Compose(trfs)
+        return transforms.Compose(trfs1)
 
 
 def image_test(args, resize_size=256, crop_size=224, alexnet=False):
@@ -357,3 +305,37 @@ def image_test(args, resize_size=256, crop_size=224, alexnet=False):
         trfs.append(normalize)
 
     return transforms.Compose(trfs)
+
+
+def get_image_transform(mode, args, resize_size=256, crop_size=224):
+    if mode == 'weak':
+        trfs = [
+            transforms.Resize((resize_size, resize_size)),
+            transforms.RandomCrop(crop_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+        ]
+    elif mode == 'simclr':
+        s = args.aug_strength
+        color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
+        if args.custom_scale:
+            trfs = [transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0))]
+        else:
+            trfs = [transforms.RandomResizedCrop(size=crop_size)]
+        trfs += [
+            transforms.RandomHorizontalFlip(),
+        ]
+        if args.jitter:
+            trfs.append(transforms.RandomApply([color_jitter], p=0.8))
+        if args.grayscale:
+            trfs.append(transforms.RandomGrayscale(p=0.2))
+        if args.gaussblur:
+            trfs.append(GaussianBlur(kernel_size=int(0.1 * crop_size)))
+        trfs.append(transforms.ToTensor())
+
+    if args.norm_img:
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        trfs.append(normalize)
+
+    return trfs

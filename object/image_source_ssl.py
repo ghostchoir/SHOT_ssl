@@ -322,6 +322,9 @@ def train_source(args):
         elif args.cr_metric == 'kl':
             dist = nn.KLDivLoss(reduction='sum').cuda()
 
+    use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (args.ssl_weight > 0)
+    use_third_pass = (args.cr_weight > 0) or (args.ssl_task == 'crsc' and args.ssl_weight > 0)
+
     while iter_num < max_iter:
         try:
             inputs_source, labels_source = iter_source.next()
@@ -339,28 +342,38 @@ def train_source(args):
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter)
 
-        if args.duplicated:
-            inputs_source1, inputs_source2, labels_source = inputs_source[0].cuda(), inputs_source[1].cuda(), labels_source.cuda()
-            f1, f2 = netF(inputs_source1), netF(inputs_source2)
-            b1, b2 = netB(f1), netB(f2)
+        inputs_source1 = None
+        inputs_source2 = None
+        inputs_source3 = None
+        labels_source = labels_source.cuda()
+
+        if type(inputs_source) is list:
+            inputs_source1 = inputs_source[0].cuda()
+            inputs_source2 = inputs_source[1].cuda()
+            if len(inputs_source) == 3:
+                inputs_source3 = inputs_source[2].cuda()
         else:
-            if args.cr_weight > 0:
-                inputs_source1, labels_source = inputs_source[0].cuda(), labels_source.cuda()
-            else:
-                inputs_source1, labels_source = inputs_source.cuda(), labels_source.cuda()
+            inputs_source1 = inputs_source.cuda()
+
+        if inputs_source1 is not None:
             f1 = netF(inputs_source1)
             b1 = netB(f1)
-
-        if args.cr_weight > 0:
-            inputs_source3 = inputs_source[-1].cuda()
-
-            with torch.no_grad():
+            outputs_source = netC(b1)
+        if use_second_pass:
+            f2 = netF(inputs_source2)
+            b2 = netB(f2)
+        if use_third_pass:
+            if args.sg3:
+                with torch.no_grad():
+                    f3 = netF(inputs_source3)
+                    b3 = netB(f3)
+                    c3 = netC(b3)
+                    conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
+            else:
                 f3 = netF(inputs_source3)
                 b3 = netB(f3)
                 c3 = netC(b3)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
-
-        outputs_source = netC(b1)
 
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
@@ -385,9 +398,17 @@ def train_source(args):
             
         if args.ssl_weight > 0:
             if args.ssl_before_btn:
-                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+                z1 = netH(f1, args.norm_feat)
+                if use_second_pass:
+                    z2 = netH(f2, args.norm_feat)
+                if use_third_pass:
+                    z3 = netH(f3, args.norm_feat)
             else:
-                z1, z2 = netH(b1, args.norm_feat), netH(b2, args.norm_feat)
+                z1 = netH(b1, args.norm_feat)
+                if use_second_pass:
+                    z2 = netH(b2, args.norm_feat)
+                if use_third_pass:
+                    z3 = netH(b3, args.norm_feat)
 
             if args.ssl_task in 'simclr':
                 ssl_loss = ssl_loss_fn(z1, z2)
@@ -396,6 +417,8 @@ def train_source(args):
                 ssl_loss = ssl_loss_fn(z, labels=labels_source)
             elif args.ssl_task == 'ls_supcon':
                 ssl_loss = ssl_loss_fn(z1, z2, labels_source)
+            elif args.ssl_task == 'crsc':
+                ssl_loss = ssl_loss_fn(z1, z3, labels_source)
         else:
             ssl_loss = torch.tensor(0.0).cuda()
 
@@ -567,7 +590,7 @@ if __name__ == "__main__":
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda', 'oda'])
     parser.add_argument('--trte', type=str, default='val', choices=['full', 'val'])
-    parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr', 'supcon', 'ls_supcon'])
+    parser.add_argument('--ssl_task', type=str, default='crsc', choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc'])
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
@@ -581,13 +604,15 @@ if __name__ == "__main__":
     parser.add_argument('--norm_feat', action='store_true')
     parser.add_argument('--norm_btn', action='store_true')
     parser.add_argument('--embedding_dim', type=int, default=128)
-    parser.add_argument('--aug_type', type=str, default='simclr', choices=['none', 'simclr', 'simsiam', 'randaug'])
+    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
+    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
+    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr'])
+    parser.add_argument('--sg3', type=str2bool, default=True)
     parser.add_argument('--aug_strength', type=float, default=1.0)
     parser.add_argument('--custom_scale', default=True, type=str2bool)
     parser.add_argument('--nojitter', action='store_true')
     parser.add_argument('--nograyscale', action='store_true')
     parser.add_argument('--nogaussblur', action='store_true')
-    parser.add_argument('--duplicated', default=False, type=str2bool)
     parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
     args = parser.parse_args()
     
@@ -598,8 +623,7 @@ if __name__ == "__main__":
     args.gaussblur = not args.nogaussblur
     args.classifier_bias = not args.classifier_bias_off
 
-    if args.ssl_weight > 0 and args.ssl_task != 'none':
-        args.duplicated = True
+    assert not (args.cr_weight > 0 and args.aug3 == 'none')
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']

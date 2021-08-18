@@ -64,11 +64,6 @@ def data_load(args):
                                             drop_last=False if args.ssl_task == 'none' else True)
 
         dsets["pl"] = cifar10c_dset_idx(args)
-        if args.noisy_pl:
-            ssl_task = args.ssl_task
-            args.ssl_task = 'none'
-            dsets["pl"].transform = cifar_train(args)
-            args.ssl_task = ssl_task
 
         dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
@@ -83,17 +78,6 @@ def data_load(args):
                                             drop_last=False if args.ssl_task == 'none' else True)
 
         dsets["pl"] = cifar100c_dset_idx(args)
-        if args.noisy_pl:
-            duplicated = args.duplicated
-            aug_type = args.aug_type
-            cr_weight = args.cr_weight
-            args.duplicated = False
-            args.aug_type = 'simclr'
-            args.cr_weight = 0
-            dsets["pl"].transform = cifar_train(args)
-            args.duplicated = duplicated
-            args.aug_type = aug_type
-            args.cr_weight = cr_weight
 
         dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
@@ -128,17 +112,6 @@ def data_load(args):
                                             drop_last=True)
 
         dsets["pl"] = ImageList_idx(txt_test, transform=image_test(args))
-        if args.noisy_pl:
-            duplicated = args.duplicated
-            aug_type = args.aug_type
-            cr_weight = args.cr_weight
-            args.duplicated = False
-            args.aug_type = 'simclr'
-            args.cr_weight = 0
-            dsets["pl"].transform = image_train(args)
-            args.duplicated = duplicated
-            args.aug_type = aug_type
-            args.cr_weight = cr_weight
 
         dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
@@ -278,6 +251,9 @@ def train_target(args):
         elif args.cr_metric == 'kl':
             dist = nn.KLDivLoss(reduction='sum').cuda()
 
+    use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (args.ssl_weight > 0)
+    use_third_pass = (args.cr_weight > 0) or (args.ssl_task == 'crsc' and args.ssl_weight > 0)
+
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
 
@@ -306,51 +282,44 @@ def train_target(args):
             mem_label, mem_conf = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
 
-            if args.mixed_pl:
-                trf_backup = dset_loaders['pl'].dataset.transform
-                aug_type = args.aug_type
-                args.aug_type = 'none'
-                dset_loaders['pl'].dataset.transform = image_train(args)
-                args.aug_type = aug_type
-                mem_label2, mem_conf2 = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
-                dset_loaders['pl'].dataset.transform = trf_backup
-                mem_label2 = torch.from_numpy(mem_label2).cuda()
-
-                pls = torch.ones(mem_label.size(0), args.class_num).cuda() * args.cls_smooth / args.class_num
-                pls[range(pls.size(0)), mem_label] = args.mixed_pl_ratio * (1 - args.cls_smooth / 2)
-                pls[range(pls.size(0)), mem_label2] = (1. - args.mixed_pl_ratio) * (1 - args.cls_smooth / 2)
-
-                mem_label = pls
-                mem_conf = (mem_conf + mem_conf2) / 2
             netF.train()
             netH.train()
             netB.train()
 
-        if args.duplicated:
-            inputs_test1, inputs_test2 = inputs_test[0].cuda(), inputs_test[1].cuda()
-            f1, f2 = netF(inputs_test1), netF(inputs_test2)
-            b1, b2 = netB(f1), netB(f2)
+        inputs_test1 = None
+        inputs_test2 = None
+        inputs_test3 = None
+
+        if type(inputs_test) is list:
+            inputs_test1 = inputs_test[0].cuda()
+            inputs_test2 = inputs_test[1].cuda()
+            if len(inputs_test) == 3:
+                inputs_test3 = inputs_test[2].cuda()
         else:
-            if args.cr_weight > 0:
-                inputs_test1 = inputs_test[0].cuda()
-            else:
-                inputs_test1 = inputs_test.cuda()
+            inputs_test1 = inputs_test.cuda()
+
+        if inputs_test is not None:
             f1 = netF(inputs_test1)
             b1 = netB(f1)
-
-        iter_num += 1
-        lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
-
-        if args.cr_weight > 0:
-            inputs_test3 = inputs_test[-1].cuda()
-
-            with torch.no_grad():
+            outputs_test = netC(b1)
+        if use_second_pass:
+            f2 = netF(inputs_test2)
+            b2 = netB(f2)
+        if use_third_pass:
+            if args.sg3:
+                with torch.no_grad():
+                    f3 = netF(inputs_test3)
+                    b3 = netB(f3)
+                    c3 = netC(b3)
+                    conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
+            else:
                 f3 = netF(inputs_test3)
                 b3 = netB(f3)
                 c3 = netC(b3)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
-        outputs_test = netC(b1)
+        iter_num += 1
+        lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
 
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
@@ -375,17 +344,13 @@ def train_target(args):
             conf_cls = mem_conf[tar_idx]
 
             pred = mem_label[tar_idx]
-            if args.mixed_pl:
-                classifier_loss = nn.BCEWithLogitsLoss()(outputs_test[conf_cls >= args.conf_threshold],
-                                                         pred[conf_cls >= args.conf_threshold])
+            if args.cls_smooth > 0:
+                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
+                    outputs_test[conf_cls >= args.conf_threshold],
+                    pred[conf_cls >= args.conf_threshold])
             else:
-                if args.cls_smooth > 0:
-                    classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
-                        outputs_test[conf_cls >= args.conf_threshold],
-                        pred[conf_cls >= args.conf_threshold])
-                else:
-                    classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf_cls >= args.conf_threshold],
-                                                            pred[conf_cls >= args.conf_threshold])
+                classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf_cls >= args.conf_threshold],
+                                                        pred[conf_cls >= args.conf_threshold])
             classifier_loss *= args.cls_par
             if iter_num < interval_iter and args.dset == "visda-c":
                 classifier_loss *= 0
@@ -404,25 +369,30 @@ def train_target(args):
 
         if args.ssl_weight > 0:
             if args.ssl_before_btn:
-                z1, z2 = netH(f1, args.norm_feat), netH(f2, args.norm_feat)
+                z1 = netH(f1, args.norm_feat)
+                if use_second_pass:
+                    z2 = netH(f2, args.norm_feat)
+                if use_third_pass:
+                    z3 = netH(f3, args.norm_feat)
             else:
-                z1, z2 = netH(b1, args.norm_feat), netH(b2, args.norm_feat)
+                z1 = netH(b1, args.norm_feat)
+                if use_second_pass:
+                    z2 = netH(b2, args.norm_feat)
+                if use_third_pass:
+                    z3 = netH(b3, args.norm_feat)
 
             if args.ssl_task == 'simclr':
                 ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
                 z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
-                if args.mixed_pl:
-                    pl = torch.argmax(mem_label[tar_idx], dim=1)
-                else:
-                    pl = mem_label[tar_idx]
+                pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z, pl)
             elif args.ssl_task == 'ls_supcon':
-                if args.mixed_pl:
-                    pl = torch.argmax(mem_label[tar_idx], dim=1)
-                else:
-                    pl = mem_label[tar_idx]
+                pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z1, z2, pl).squeeze()
+            elif args.ssl_task == 'crsc':
+                pl = mem_label[tar_idx]
+                ssl_loss = ssl_loss_fn(z1, z3, pl).squeeze()
             classifier_loss += args.ssl_weight * ssl_loss
 
         if args.cr_weight > 0:
@@ -488,12 +458,8 @@ def obtain_label(loader, netF, netH, netB, netC, args):
         for _ in range(len(loader)):
             data = iter_test.next()
 
-            if args.noisy_pl:
-                inputs = data[0][0]
-                labels = data[1]
-            else:
-                inputs = data[0]
-                labels = data[1]
+            inputs = data[0]
+            labels = data[1]
             inputs = inputs.cuda()
             feas = netB(netF(inputs))
             outputs = netC(feas)
@@ -611,7 +577,7 @@ if __name__ == "__main__":
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda'])
     parser.add_argument('--issave', type=bool, default=True)
 
-    parser.add_argument('--ssl_task', type=str, default='simclr', choices=['none', 'simclr', 'supcon', 'ls_supcon'])
+    parser.add_argument('--ssl_task', type=str, default='crsc', choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc'])
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
@@ -630,10 +596,10 @@ if __name__ == "__main__":
     parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls', 'uniform'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
     parser.add_argument('--pl_temperature', type=float, default=1.0)
-    parser.add_argument('--mixed_pl', action='store_true')
-    parser.add_argument('--mixed_pl_ratio', type=float, default=0.7)
-
-    parser.add_argument('--aug_type', type=str, default='simclr')
+    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
+    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
+    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr'])
+    parser.add_argument('--sg3', type=str2bool, default=True)
     parser.add_argument('--aug_strength', type=float, default=1.0)
     parser.add_argument('--custom_scale', default=True, type=str2bool)
     parser.add_argument('--nojitter', action='store_true')
@@ -642,7 +608,6 @@ if __name__ == "__main__":
     parser.add_argument('--duplicated', default=False, type=str2bool)
     parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
 
-    parser.add_argument('--noisy_pl', action='store_true')
     args = parser.parse_args()
 
     args.pretrained = not args.nopretrained
@@ -654,10 +619,7 @@ if __name__ == "__main__":
     args.ent = not args.noent
     args.gent = not args.nogent
 
-    if args.ssl_weight > 0 and args.ssl_task != 'none':
-        args.duplicated = True
-
-    assert not (args.mixed_pl and args.noisy_pl)
+    assert not (args.cr_weight > 0 and args.aug3 == 'none')
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']
