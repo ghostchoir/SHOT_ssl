@@ -305,7 +305,7 @@ def train_source(args):
     
     if args.ssl_task == 'simclr':
         ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
-    elif args.ssl_task == 'supcon':
+    elif args.ssl_task in ['supcon', 'crsc']:
         ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
     elif args.ssl_task == 'ls_supcon':
         ssl_loss_fn = LabelSmoothedSCLLoss(args.batch_size, args.temperature, args.class_num, args.ssl_smooth)
