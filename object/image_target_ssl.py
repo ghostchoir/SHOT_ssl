@@ -391,8 +391,9 @@ def train_target(args):
                 pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z1, z2, pl).squeeze()
             elif args.ssl_task == 'crsc':
+                z = torch.cat([z1.unsqueeze(1), z3.unsqueeze(1)], dim=1)
                 pl = mem_label[tar_idx]
-                ssl_loss = ssl_loss_fn(z1, z3, pl).squeeze()
+                ssl_loss = ssl_loss_fn(z, pl)
             classifier_loss += args.ssl_weight * ssl_loss
 
         if args.cr_weight > 0:

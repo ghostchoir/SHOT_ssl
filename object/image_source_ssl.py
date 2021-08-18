@@ -418,7 +418,8 @@ def train_source(args):
             elif args.ssl_task == 'ls_supcon':
                 ssl_loss = ssl_loss_fn(z1, z2, labels_source)
             elif args.ssl_task == 'crsc':
-                ssl_loss = ssl_loss_fn(z1, z3, labels_source)
+                z = torch.cat([z1.unsqueeze(1), z3.unsqueeze(1)], dim=1)
+                ssl_loss = ssl_loss_fn(z, labels_source)
         else:
             ssl_loss = torch.tensor(0.0).cuda()
 
