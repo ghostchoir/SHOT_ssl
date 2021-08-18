@@ -131,7 +131,7 @@ class feat_classifier(nn.Module):
 class ssl_head(nn.Module):
     def __init__(self, ssl_task, feature_dim, embedding_dim=128):
         super(ssl_head, self).__init__()
-        if ssl_task.lower() in ['simclr', 'supcon', 'ls_supcon']:
+        if ssl_task.lower() in ['simclr', 'supcon', 'ls_supcon', 'crsc']:
             self.head = nn.Sequential(
                 nn.Linear(feature_dim, feature_dim),
                 nn.ReLU(inplace=True),
