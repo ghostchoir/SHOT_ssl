@@ -323,7 +323,7 @@ def train_source(args):
             dist = nn.KLDivLoss(reduction='sum').cuda()
 
     use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (args.ssl_weight > 0)
-    use_third_pass = (args.cr_weight > 0) or (args.ssl_task == 'crsc' and args.ssl_weight > 0)
+    use_third_pass = (args.cr_weight > 0) or (args.ssl_task == 'crsc' and args.ssl_weight > 0) or (args.cls3)
 
     while iter_num < max_iter:
         try:
@@ -395,7 +395,13 @@ def train_source(args):
             classifier_loss = nn.CrossEntropyLoss()(outputs_source, labels_source)
         else:
             classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(outputs_source, labels_source)
-            
+
+        if args.cls3:
+            if args.smooth == 0:
+                classifier_loss = nn.CrossEntropyLoss()(c3, labels_source)
+            else:
+                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(c3, labels_source)
+
         if args.ssl_weight > 0:
             if args.ssl_before_btn:
                 z1 = netH(f1, args.norm_feat)
@@ -609,6 +615,7 @@ if __name__ == "__main__":
     parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
     parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr'])
     parser.add_argument('--sg3', type=str2bool, default=True)
+    parser.add_argument('--cls3', type=str2bool, default=False)
     parser.add_argument('--aug_strength', type=float, default=1.0)
     parser.add_argument('--custom_scale', default=True, type=str2bool)
     parser.add_argument('--nojitter', action='store_true')
@@ -625,6 +632,7 @@ if __name__ == "__main__":
     args.classifier_bias = not args.classifier_bias_off
 
     assert not (args.cr_weight > 0 and args.aug3 == 'none')
+    assert not (args.sg3 and args.cls3)
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']

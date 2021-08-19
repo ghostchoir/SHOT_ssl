@@ -252,7 +252,7 @@ def train_target(args):
             dist = nn.KLDivLoss(reduction='sum').cuda()
 
     use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (args.ssl_weight > 0)
-    use_third_pass = (args.cr_weight > 0) or (args.ssl_task == 'crsc' and args.ssl_weight > 0)
+    use_third_pass = (args.cr_weight > 0) or (args.ssl_task == 'crsc' and args.ssl_weight > 0) or (args.cls3)
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
@@ -351,6 +351,14 @@ def train_target(args):
             else:
                 classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf_cls >= args.conf_threshold],
                                                         pred[conf_cls >= args.conf_threshold])
+            if args.cls3:
+                if args.cls_smooth > 0:
+                    classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
+                        c3[conf_cls >= args.conf_threshold],
+                        pred[conf_cls >= args.conf_threshold])
+                else:
+                    classifier_loss = nn.CrossEntropyLoss()(c3[conf_cls >= args.conf_threshold],
+                                                            pred[conf_cls >= args.conf_threshold])
             classifier_loss *= args.cls_par
             if iter_num < interval_iter and args.dset == "visda-c":
                 classifier_loss *= 0
@@ -601,6 +609,7 @@ if __name__ == "__main__":
     parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
     parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr'])
     parser.add_argument('--sg3', type=str2bool, default=True)
+    parser.add_argument('--cls3', type=str2bool, default=False)
     parser.add_argument('--aug_strength', type=float, default=1.0)
     parser.add_argument('--custom_scale', default=True, type=str2bool)
     parser.add_argument('--nojitter', action='store_true')
@@ -621,6 +630,7 @@ if __name__ == "__main__":
     args.gent = not args.nogent
 
     assert not (args.cr_weight > 0 and args.aug3 == 'none')
+    assert not (args.sg3 and args.cls3)
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']
