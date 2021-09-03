@@ -303,7 +303,7 @@ def train_source(args):
     netB.train()
     netC.train()
     
-    if args.ssl_task == 'simclr':
+    if args.ssl_task in ['simclr', 'crs']:
         ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
     elif args.ssl_task in ['supcon', 'crsc']:
         ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
@@ -323,7 +323,7 @@ def train_source(args):
             dist = nn.KLDivLoss(reduction='sum').cuda()
 
     use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (args.ssl_weight > 0)
-    use_third_pass = (args.cr_weight > 0) or (args.ssl_task == 'crsc' and args.ssl_weight > 0) or (args.cls3)
+    use_third_pass = (args.cr_weight > 0) or (args.ssl_task in ['crsc', 'crs'] and args.ssl_weight > 0) or (args.cls3)
 
     while iter_num < max_iter:
         try:
@@ -426,6 +426,8 @@ def train_source(args):
             elif args.ssl_task == 'crsc':
                 z = torch.cat([z1.unsqueeze(1), z3.unsqueeze(1)], dim=1)
                 ssl_loss = ssl_loss_fn(z, labels_source)
+            elif args.ssl_task == 'crs':
+                ssl_loss = ssl_loss_fn(z1, z3)
         else:
             ssl_loss = torch.tensor(0.0).cuda()
 
@@ -597,7 +599,7 @@ if __name__ == "__main__":
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda', 'oda'])
     parser.add_argument('--trte', type=str, default='val', choices=['full', 'val'])
-    parser.add_argument('--ssl_task', type=str, default='crsc', choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc'])
+    parser.add_argument('--ssl_task', type=str, default='crsc', choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc', 'crs'])
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
