@@ -1,9 +1,9 @@
 from torchvision import transforms, datasets
 import numpy as np
 import cv2
+
 cv2.setNumThreads(0)
 from data_list import CIFAR10_idx, CIFAR100_idx
-
 
 corruptions = ['gaussian_noise', 'shot_noise', 'impulse_noise', 'defocus_blur', 'glass_blur',
                'motion_blur', 'zoom_blur', 'snow', 'frost', 'fog',
@@ -22,6 +22,7 @@ class DuplicatedCompose(object):
             img2 = t(img2)
         return img1, img2
 
+
 class DualCompose(object):
     def __init__(self, trfs1, trfs2):
         self.trfs1 = trfs1
@@ -35,6 +36,7 @@ class DualCompose(object):
         for t2 in self.trfs2:
             img2 = t2(img2)
         return img1, img2
+
 
 class TripletCompose(object):
     def __init__(self, trfs1, trfs2, trfs3):
@@ -54,6 +56,7 @@ class TripletCompose(object):
             img3 = t3(img3)
         return img1, img2, img3
 
+
 class GaussianBlur(object):
     # Implements Gaussian blur as described in the SimCLR paper
     def __init__(self, kernel_size, min=0.1, max=2.0, p=0.5):
@@ -61,10 +64,10 @@ class GaussianBlur(object):
         self.max = max
         # kernel size is set to be 10% of the image height/width
         self.kernel_size = kernel_size
-        
+
         if self.kernel_size % 2 == 0:
             self.kernel_size += 1
-            
+
         self.prob = p
 
     def __call__(self, sample):
@@ -78,6 +81,7 @@ class GaussianBlur(object):
             sample = cv2.GaussianBlur(sample, (self.kernel_size, self.kernel_size), sigma)
 
         return sample
+
 
 # def get_train_aug(args, resize_size=256, img_size=224):
 #     if args.aug_type == 'simclr':
@@ -129,7 +133,7 @@ class GaussianBlur(object):
 #             trfs.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
 #
 #     return trfs
-    
+
 def cifar_train(args):
     normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
 
@@ -176,7 +180,7 @@ def cifar_train(args):
             trfs.append(transforms.RandomGrayscale(p=0.2))
         if args.gaussblur:
             trfs.append(GaussianBlur(kernel_size=int(0.1 * 32)))
-            
+
         trfs.append(transforms.ToTensor())
     else:
         trfs = [
@@ -184,91 +188,93 @@ def cifar_train(args):
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
         ]
-        
+
     if args.norm_img:
         trfs.append(normalize)
-    
+
     if args.duplicated:
         return DuplicatedCompose(trfs)
     else:
         return transforms.Compose(trfs)
 
+
 def cifar_test():
     normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-    
+
     return transforms.Compose([
         transforms.ToTensor(),
         normalize,
     ])
 
+
 def cifar10c_dset(args):
-    
-    dset = datasets.CIFAR10(root=args.folder+'CIFAR-10-C',
+    dset = datasets.CIFAR10(root=args.folder + 'CIFAR-10-C',
                             train=False,
                             download=False,
                             transform=cifar_test()
-                           )
-    
+                            )
+
     tsize = 10000
-    tset_raw = np.load(args.folder + 'CIFAR-10-C/%s.npy' %(corruptions[args.t]))
-    tset_raw = tset_raw[(args.level-1)*tsize: args.level*tsize]
-    
+    tset_raw = np.load(args.folder + 'CIFAR-10-C/%s.npy' % (corruptions[args.t]))
+    tset_raw = tset_raw[(args.level - 1) * tsize: args.level * tsize]
+
     dset.data = tset_raw
-    
+
     return dset
+
 
 def cifar10c_dset_idx(args):
-    
-    dset = CIFAR10_idx(root=args.folder+'CIFAR-10-C',
-                            train=False,
-                            download=False,
-                            transform=cifar_test()
-                           )
-    
+    dset = CIFAR10_idx(root=args.folder + 'CIFAR-10-C',
+                       train=False,
+                       download=False,
+                       transform=cifar_test()
+                       )
+
     tsize = 10000
-    tset_raw = np.load(args.folder + 'CIFAR-10-C/%s.npy' %(corruptions[args.t]))
-    tset_raw = tset_raw[(args.level-1)*tsize: args.level*tsize]
-    
+    tset_raw = np.load(args.folder + 'CIFAR-10-C/%s.npy' % (corruptions[args.t]))
+    tset_raw = tset_raw[(args.level - 1) * tsize: args.level * tsize]
+
     dset.data = tset_raw
-    
+
     return dset
+
 
 def cifar100c_dset(args):
-    
-    dset = datasets.CIFAR100(root=args.folder+'CIFAR-100-C',
-                            train=False,
-                            download=False,
-                            transform=cifar_test()
-                           )
-    
+    dset = datasets.CIFAR100(root=args.folder + 'CIFAR-100-C',
+                             train=False,
+                             download=False,
+                             transform=cifar_test()
+                             )
+
     tsize = 10000
-    tset_raw = np.load(args.folder + 'CIFAR-100-C/%s.npy' %(corruptions[args.t]))
-    tset_raw = tset_raw[(args.level-1)*tsize: args.level*tsize]
-    
+    tset_raw = np.load(args.folder + 'CIFAR-100-C/%s.npy' % (corruptions[args.t]))
+    tset_raw = tset_raw[(args.level - 1) * tsize: args.level * tsize]
+
     dset.data = tset_raw
-    
+
     return dset
 
+
 def cifar100c_dset_idx(args):
-    
-    dset = CIFAR100_idx(root=args.folder+'CIFAR-100-C',
-                            train=False,
-                            download=False,
-                            transform=cifar_test()
-                           )
-    
+    dset = CIFAR100_idx(root=args.folder + 'CIFAR-100-C',
+                        train=False,
+                        download=False,
+                        transform=cifar_test()
+                        )
+
     tsize = 10000
-    tset_raw = np.load(args.folder + 'CIFAR-100-C/%s.npy' %(corruptions[args.t]))
-    tset_raw = tset_raw[(args.level-1)*tsize: args.level*tsize]
-    
+    tset_raw = np.load(args.folder + 'CIFAR-100-C/%s.npy' % (corruptions[args.t]))
+    tset_raw = tset_raw[(args.level - 1) * tsize: args.level * tsize]
+
     dset.data = tset_raw
-    
+
     return dset
+
 
 def image_train(args, resize_size=256, crop_size=224, alexnet=False):
     if not alexnet:
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                   std=[0.229, 0.224, 0.225])
+                                         std=[0.229, 0.224, 0.225])
     else:
         normalize = Normalize(meanfile='./ilsvrc_2012_mean.npy')
 
@@ -294,13 +300,13 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
 def image_test(args, resize_size=256, crop_size=224, alexnet=False):
     if not alexnet:
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+                                         std=[0.229, 0.224, 0.225])
     else:
         normalize = Normalize(meanfile='./ilsvrc_2012_mean.npy')
 
     trfs = [transforms.Resize((resize_size, resize_size)),
             transforms.CenterCrop(crop_size),
-            transforms.ToTensor(),]
+            transforms.ToTensor(), ]
 
     if args.norm_img:
         trfs.append(normalize)
@@ -319,10 +325,16 @@ def get_image_transform(mode, args, resize_size=256, crop_size=224):
     elif mode == 'simclr':
         s = args.aug_strength
         color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
-        if args.custom_scale:
-            trfs = [transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0))]
+        if args.use_rrc:
+            if args.custom_scale:
+                trfs = [transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0))]
+            else:
+                trfs = [transforms.RandomResizedCrop(size=crop_size)]
         else:
-            trfs = [transforms.RandomResizedCrop(size=crop_size)]
+            trfs = [
+                transforms.Resize((resize_size, resize_size)),
+                transforms.RandomCrop(crop_size),
+            ]
         trfs += [
             transforms.RandomHorizontalFlip(),
         ]
