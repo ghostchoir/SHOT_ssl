@@ -223,17 +223,22 @@ def train_target(args):
         netC.cuda()
 
     param_group = []
-    for k, v in netF.named_parameters():
-        if args.lr_decay1 > 0:
-            param_group += [{'params': v, 'lr': args.lr * args.lr_decay1}]
-        else:
-            v.requires_grad = False
-    for k, v in netB.named_parameters():
-        if args.lr_decay2 > 0:
-            param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
-        else:
-            v.requires_grad = False
-    for k, v in netH.named_parameters():
+    # for k, v in netF.named_parameters():
+    #     if args.lr_decay1 > 0:
+    #         param_group += [{'params': v, 'lr': args.lr * args.lr_decay1}]
+    #     else:
+    #         v.requires_grad = False
+    # for k, v in netB.named_parameters():
+    #     if args.lr_decay2 > 0:
+    #         param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
+    #     else:
+    #         v.requires_grad = False
+    # for k, v in netH.named_parameters():
+    #     if args.lr_decay2 > 0:
+    #         param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
+    #     else:
+    #         v.requires_grad = False
+    for k, v in netC.named_parameters():
         if args.lr_decay2 > 0:
             param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
         else:
