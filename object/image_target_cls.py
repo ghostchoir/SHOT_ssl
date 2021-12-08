@@ -283,15 +283,11 @@ def train_target(args):
                 continue
 
         if iter_num % interval_iter == 0 and (args.cls_par > 0 or args.ssl_task in ['supcon', 'ls_supcon', 'crsc']):
-            netF.eval()
-            netH.eval()
-            netB.eval()
+            netC.eval()
             mem_label, mem_conf = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
 
-            netF.train()
-            netH.train()
-            netB.train()
+            netC.train()
 
         inputs_test1 = None
         inputs_test2 = None
