@@ -77,11 +77,11 @@ def data_load(args):
 
         dsets["pl"] = cifar10c_dset_idx(args)
 
-        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 8, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
 
         dsets["test"] = cifar10c_dset_idx(args)
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 8, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
     elif args.dset == 'CIFAR-100-C':
         dsets["target"] = cifar100c_dset_idx(args)
@@ -91,10 +91,10 @@ def data_load(args):
 
         dsets["pl"] = cifar100c_dset_idx(args)
 
-        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 8, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
         dsets["test"] = cifar100c_dset_idx(args)
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 8, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
     else:
         txt_tar = open(args.t_dset_path).readlines()
@@ -125,11 +125,11 @@ def data_load(args):
 
         dsets["pl"] = ImageList_idx(txt_test, transform=image_test(args))
 
-        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 8, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
 
         dsets["test"] = ImageList_idx(txt_test, transform=image_test(args))
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 8, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
 
     return dset_loaders
