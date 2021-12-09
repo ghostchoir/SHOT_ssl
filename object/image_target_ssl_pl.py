@@ -353,7 +353,7 @@ def train_target(args):
             else:
                 raise NotImplementedError
 
-        thres_idx = np.logical_and(conf >= args.cr_threshold, conf_dist <= dist_thres)
+        thres_idx = torch.logical_and(conf >= args.cr_threshold, conf_dist <= dist_thres)
         if args.cls_par > 0:
             # with torch.no_grad():
             #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
