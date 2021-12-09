@@ -296,6 +296,7 @@ def train_target(args):
             mem_label, mem_conf, conf_by_dist = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
             conf_by_dist = torch.from_numpy(conf_by_dist).cuda()
+            conf_dist = conf_by_dist[tar_idx]
 
             netF.train()
             netH.train()
@@ -357,7 +358,6 @@ def train_target(args):
             #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
             #    conf = conf.cpu().numpy()
             conf_cls = mem_conf[tar_idx]
-            conf_dist = conf_by_dist[tar_idx]
 
             pred = mem_label[tar_idx]
             if args.cls_smooth > 0:
@@ -426,8 +426,8 @@ def train_target(args):
 
         if args.cr_weight > 0:
             try:
-                cr_loss = dist(f_hard[conf <= args.cr_threshold and conf_dist <= dist_thres],
-                               f_weak[conf <= args.cr_threshold and conf_dist <= dist_thres]).mean()
+                cr_loss = dist(f_hard[np.logical_and(conf <= args.cr_threshold, conf_dist <= dist_thres)],
+                               f_weak[np.logical_and(conf <= args.cr_threshold, conf_dist <= dist_thres)]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
