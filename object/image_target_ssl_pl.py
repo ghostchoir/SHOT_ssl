@@ -362,21 +362,21 @@ def train_target(args):
             pred = mem_label[tar_idx]
             if args.cls_smooth > 0:
                 classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
-                    outputs_test[conf_cls >= args.conf_threshold and conf_dist >= dist_thres],
-                    pred[conf_cls >= args.conf_threshold and conf_dist >= dist_thres])
+                    outputs_test[conf_cls >= args.conf_threshold and conf_dist <= dist_thres],
+                    pred[conf_cls >= args.conf_threshold and conf_dist <= dist_thres])
             else:
                 classifier_loss = nn.CrossEntropyLoss()(
-                    outputs_test[conf_cls >= args.conf_threshold and conf_dist >= dist_thres],
-                    pred[conf_cls >= args.conf_threshold and conf_dist >= dist_thres])
+                    outputs_test[conf_cls >= args.conf_threshold and conf_dist <= dist_thres],
+                    pred[conf_cls >= args.conf_threshold and conf_dist <= dist_thres])
             if args.cls3:
                 if args.cls_smooth > 0:
                     classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
-                        c3[conf_cls >= args.conf_threshold and conf_dist >= dist_thres],
-                        pred[conf_cls >= args.conf_threshold and conf_dist >= dist_thres])
+                        c3[conf_cls >= args.conf_threshold and conf_dist <= dist_thres],
+                        pred[conf_cls >= args.conf_threshold and conf_dist <= dist_thres])
                 else:
                     classifier_loss = nn.CrossEntropyLoss()(
-                        c3[conf_cls >= args.conf_threshold and conf_dist >= dist_thres],
-                        pred[conf_cls >= args.conf_threshold and conf_dist >= dist_thres])
+                        c3[conf_cls >= args.conf_threshold and conf_dist <= dist_thres],
+                        pred[conf_cls >= args.conf_threshold and conf_dist <= dist_thres])
             classifier_loss *= args.cls_par
             if iter_num < interval_iter and args.dset == "visda-c":
                 classifier_loss *= 0
@@ -426,8 +426,8 @@ def train_target(args):
 
         if args.cr_weight > 0:
             try:
-                cr_loss = dist(f_hard[conf <= args.cr_threshold and conf_dist >= dist_thres],
-                               f_weak[conf <= args.cr_threshold and conf_dist >= dist_thres]).mean()
+                cr_loss = dist(f_hard[conf <= args.cr_threshold and conf_dist <= dist_thres],
+                               f_weak[conf <= args.cr_threshold and conf_dist <= dist_thres]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
@@ -644,8 +644,8 @@ if __name__ == "__main__":
     parser.add_argument('--duplicated', default=False, type=str2bool)
     parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
 
-    parser.add_argument('--dist_thres_start', type=float, default=-1.0)
-    parser.add_argument('--dist_thres_end', type=float, default=-1.0)
+    parser.add_argument('--dist_thres_start', type=float, default=2.0)
+    parser.add_argument('--dist_thres_end', type=float, default=2.0)
     parser.add_argument('--dist_thres_mode', type=str, choices=['none', 'const', 'linear'])
 
     args = parser.parse_args()
