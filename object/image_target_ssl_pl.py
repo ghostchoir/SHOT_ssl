@@ -456,7 +456,7 @@ def train_target(args):
             args.out_file.write(log_str + '\n')
             args.out_file.flush()
             print(log_str + '\n')
-            print('Survival rate:', thres_idx.count_nonzero().item() / args.batch_size)
+            print('Survival rate:', thres_idx.int().sum().item() / args.batch_size)
             netF.train()
             netH.train()
             netB.train()
