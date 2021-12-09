@@ -295,6 +295,7 @@ def train_target(args):
             netB.eval()
             mem_label, mem_conf, conf_by_dist = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
+            mem_conf = torch.from_numpy(mem_conf).cuda()
             conf_cls = mem_conf[tar_idx]
             conf_by_dist = torch.from_numpy(conf_by_dist).cuda()
             conf_dist = conf_by_dist[tar_idx]
@@ -319,6 +320,7 @@ def train_target(args):
             f1 = netF(inputs_test1)
             b1 = netB(f1)
             outputs_test = netC(b1)
+            conf_live = torch.max(F.softmax(outputs_test, dim=1), dim=1)[0]
         if use_second_pass:
             f2 = netF(inputs_test2)
             b2 = netB(f2)
@@ -328,12 +330,12 @@ def train_target(args):
                     f3 = netF(inputs_test3)
                     b3 = netB(f3)
                     c3 = netC(b3)
-                    conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
+                    conf_cr = torch.max(F.softmax(c3, dim=1), dim=1)[0]
             else:
                 f3 = netF(inputs_test3)
                 b3 = netB(f3)
                 c3 = netC(b3)
-                conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
+                conf_cr = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
@@ -354,8 +356,12 @@ def train_target(args):
             else:
                 raise NotImplementedError
 
-        cr_thres_idx = torch.logical_and(conf >= args.cr_threshold, conf_dist <= dist_thres)
-        cls_thres_idx = torch.logical_and(conf_cls >= args.conf_threshold, conf_dist <= dist_thres)
+        cr_thres_idx = torch.logical_and(conf_cr >= args.cr_threshold, conf_dist <= dist_thres)
+        if args.conf_threshold_point == 'pl':
+            cls_thres_idx = torch.logical_and(conf_cls >= args.conf_threshold, conf_dist <= dist_thres)
+        elif args.conf_threshold_point == 'live':
+            cls_thres_idx = torch.logical_and(conf_live >= args.conf_threshold, conf_dist <= dist_thres)
+
         if args.cls_par > 0:
             # with torch.no_grad():
             #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
@@ -624,6 +630,7 @@ if __name__ == "__main__":
     parser.add_argument('--cr_threshold', type=float, default=0.0)
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
+    parser.add_argument('--conf_threshold_point', type=str, choices=['pl', 'live'], default='pl')
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')
