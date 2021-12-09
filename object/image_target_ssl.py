@@ -408,7 +408,7 @@ def train_target(args):
 
         if args.cr_weight > 0:
             try:
-                cr_loss = dist(f_hard[conf <= args.cr_threshold], f_weak[conf <= args.cr_threshold]).mean()
+                cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak[conf >= args.cr_threshold]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
