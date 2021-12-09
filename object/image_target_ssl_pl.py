@@ -295,6 +295,7 @@ def train_target(args):
             netB.eval()
             mem_label, mem_conf, conf_by_dist = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
+            conf_cls = mem_conf[tar_idx]
             conf_by_dist = torch.from_numpy(conf_by_dist).cuda()
             conf_dist = conf_by_dist[tar_idx]
 
@@ -353,31 +354,31 @@ def train_target(args):
             else:
                 raise NotImplementedError
 
-        thres_idx = torch.logical_and(conf >= args.cr_threshold, conf_dist <= dist_thres)
+        cr_thres_idx = torch.logical_and(conf >= args.cr_threshold, conf_dist <= dist_thres)
+        cls_thres_idx = torch.logical_and(conf_cls >= args.conf_threshold, conf_dist <= dist_thres)
         if args.cls_par > 0:
             # with torch.no_grad():
             #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
             #    conf = conf.cpu().numpy()
-            conf_cls = mem_conf[tar_idx]
 
             pred = mem_label[tar_idx]
             if args.cls_smooth > 0:
                 classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
-                    outputs_test[thres_idx],
-                    pred[thres_idx])
+                    outputs_test[cls_thres_idx],
+                    pred[cls_thres_idx])
             else:
                 classifier_loss = nn.CrossEntropyLoss()(
-                    outputs_test[thres_idx],
-                    pred[thres_idx])
+                    outputs_test[cls_thres_idx],
+                    pred[cls_thres_idx])
             if args.cls3:
                 if args.cls_smooth > 0:
                     classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
-                        c3[thres_idx],
-                        pred[thres_idx])
+                        c3[cls_thres_idx],
+                        pred[cls_thres_idx])
                 else:
                     classifier_loss = nn.CrossEntropyLoss()(
-                        c3[thres_idx],
-                        pred[thres_idx])
+                        c3[cls_thres_idx],
+                        pred[cls_thres_idx])
             classifier_loss *= args.cls_par
             if iter_num < interval_iter and args.dset == "visda-c":
                 classifier_loss *= 0
@@ -427,8 +428,8 @@ def train_target(args):
 
         if args.cr_weight > 0:
             try:
-                cr_loss = dist(f_hard[thres_idx],
-                               f_weak[thres_idx]).mean()
+                cr_loss = dist(f_hard[cr_thres_idx],
+                               f_weak[cr_thres_idx]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
@@ -456,7 +457,8 @@ def train_target(args):
             args.out_file.write(log_str + '\n')
             args.out_file.flush()
             print(log_str + '\n')
-            print('Survival rate:', thres_idx.int().sum().item() / args.batch_size)
+            print('Cls survival rate:', cls_thres_idx.int().sum().item() / args.batch_size)
+            print('CR survival rate:', cr_thres_idx.int().sum().item() / args.batch_size)
             netF.train()
             netH.train()
             netB.train()
@@ -619,7 +621,7 @@ if __name__ == "__main__":
     parser.add_argument('--cr_weight', type=float, default=0.0)
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce', 'kl'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
-    parser.add_argument('--cr_threshold', type=float, default=1.0)
+    parser.add_argument('--cr_threshold', type=float, default=0.0)
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=0.07)
