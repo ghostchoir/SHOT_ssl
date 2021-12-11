@@ -56,7 +56,7 @@ def get_dist_thres_value(args, iter_num, max_iter):
     end = args.dist_thres_end
 
     if args.dist_thres_mode == 'none':
-        return float("-inf")
+        return float("inf")
     if args.dist_thres_mode == 'const':
         return start
     if args.dist_thres_mode == 'linear':
