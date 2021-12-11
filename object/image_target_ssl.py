@@ -594,7 +594,7 @@ if __name__ == "__main__":
     parser.add_argument('--cr_weight', type=float, default=0.0)
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce', 'kl'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
-    parser.add_argument('--cr_threshold', type=float, default=1.0)
+    parser.add_argument('--cr_threshold', type=float, default=-1.0)
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=0.07)
