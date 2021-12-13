@@ -296,7 +296,7 @@ def train_target(args):
     interval_iter = max_iter // args.interval
     iter_num = 0
 
-    switch_training_iter = max_iter // args.switch_training_interval
+    switch_training_iter = int(max_iter / args.switch_training_interval)
     # start from feat
     curr_training_mode = 'cls'
 
@@ -676,7 +676,7 @@ if __name__ == "__main__":
     parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
 
     parser.add_argument('--switch_training', type=str2bool, default=True)
-    parser.add_argument('--switch_training_interval', type=int, default=5)
+    parser.add_argument('--switch_training_interval', type=float, default=5)
 
     args = parser.parse_args()
 
