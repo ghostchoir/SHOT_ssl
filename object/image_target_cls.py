@@ -51,6 +51,35 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
     return optimizer
 
 
+def switch_training_stage(netF, netH, netB, netC, mode):
+    if mode == 'feat':
+        for k, v in netF.named_parameters():
+            v.requires_grad = True
+        for k, v in netB.named_parameters():
+            v.requires_grad = True
+        for k, v in netH.named_parameters():
+            v.requires_grad = True
+        for k, v in netC.named_parameters():
+            v.requires_grad = False
+        netF.train()
+        netH.train()
+        netB.train()
+        netC.eval()
+    elif mode == 'cls':
+        for k, v in netF.named_parameters():
+            v.requires_grad = False
+        for k, v in netB.named_parameters():
+            v.requires_grad = False
+        for k, v in netH.named_parameters():
+            v.requires_grad = False
+        for k, v in netC.named_parameters():
+            v.requires_grad = True
+        netF.eval()
+        netH.eval()
+        netB.eval()
+        netC.train()
+
+
 def data_load(args):
     ## prepare data
     dsets = {}
@@ -200,16 +229,10 @@ def train_target(args):
         print('Skipped loading btn for version compatibility')
     modelpath = args.output_dir_src + '/source_C.pt'
     netC.load_state_dict(torch.load(modelpath))
-    netF.eval()
-    for k, v in netF.named_parameters():
-        v.requires_grad = False
-    netH.eval()
-    for k, v in netH.named_parameters():
-        v.requires_grad = False
-    netB.eval()
-    for k, v in netB.named_parameters():
-        v.requires_grad = False
-    netC.train()
+    netF.train()
+    netH.train()
+    netB.train()
+    netC.eval()
 
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
@@ -223,21 +246,21 @@ def train_target(args):
         netC.cuda()
 
     param_group = []
-    # for k, v in netF.named_parameters():
-    #     if args.lr_decay1 > 0:
-    #         param_group += [{'params': v, 'lr': args.lr * args.lr_decay1}]
-    #     else:
-    #         v.requires_grad = False
-    # for k, v in netB.named_parameters():
-    #     if args.lr_decay2 > 0:
-    #         param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
-    #     else:
-    #         v.requires_grad = False
-    # for k, v in netH.named_parameters():
-    #     if args.lr_decay2 > 0:
-    #         param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
-    #     else:
-    #         v.requires_grad = False
+    for k, v in netF.named_parameters():
+        if args.lr_decay1 > 0:
+            param_group += [{'params': v, 'lr': args.lr * args.lr_decay1}]
+        else:
+            v.requires_grad = True
+    for k, v in netB.named_parameters():
+        if args.lr_decay2 > 0:
+            param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
+        else:
+            v.requires_grad = True
+    for k, v in netH.named_parameters():
+        if args.lr_decay2 > 0:
+            param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
+        else:
+            v.requires_grad = True
     for k, v in netC.named_parameters():
         if args.lr_decay2 > 0:
             param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
@@ -273,6 +296,10 @@ def train_target(args):
     interval_iter = max_iter // args.interval
     iter_num = 0
 
+    switch_training_iter = max_iter // args.switch_training_interval
+    # start from feat
+    curr_training_mode = 'cls'
+
     while iter_num < max_iter:
         try:
             inputs_test, _, tar_idx = iter_test.next()
@@ -287,12 +314,27 @@ def train_target(args):
             if inputs_test[0].size(0) == 1:
                 continue
 
+        if iter_num % switch_training_iter == 0:
+            if curr_training_mode == 'feat':
+                curr_training_mode = 'cls'
+            elif curr_training_mode == 'cls':
+                curr_training_mode = 'feat'
+            switch_training_stage(netF, netB, netH, netC, curr_training_mode)
+
         if iter_num % interval_iter == 0 and (args.cls_par > 0 or args.ssl_task in ['supcon', 'ls_supcon', 'crsc']):
+            netF.eval()
+            netB.eval()
+            netH.eval()
             netC.eval()
             mem_label, mem_conf = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
             mem_label = torch.from_numpy(mem_label).cuda()
 
-            netC.train()
+            if curr_training_mode == 'feat':
+                netF.train()
+                netB.train()
+                netH.train()
+            elif curr_training_mode == 'cls':
+                netC.train()
 
         inputs_test1 = None
         inputs_test2 = None
@@ -383,7 +425,7 @@ def train_target(args):
             im_loss = entropy_loss * args.ent_par
             classifier_loss += im_loss
 
-        if args.ssl_weight > 0:
+        if args.ssl_weight > 0 and curr_training_mode == 'feat':
             if args.ssl_before_btn:
                 z1 = netH(f1, args.norm_feat)
                 if use_second_pass:
@@ -430,6 +472,9 @@ def train_target(args):
         optimizer.step()
 
         if iter_num % interval_iter == 0 or iter_num == max_iter:
+            netF.eval()
+            netH.eval()
+            netB.eval()
             netC.eval()
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
@@ -442,7 +487,12 @@ def train_target(args):
             args.out_file.write(log_str + '\n')
             args.out_file.flush()
             print(log_str + '\n')
-            netC.train()
+            if curr_training_mode == 'feat':
+                netF.train()
+                netB.train()
+                netH.train()
+            elif curr_training_mode == 'cls':
+                netC.train()
 
     if args.issave:
         if args.dataparallel:
@@ -624,6 +674,9 @@ if __name__ == "__main__":
     parser.add_argument('--nogaussblur', action='store_true')
     parser.add_argument('--duplicated', default=False, type=str2bool)
     parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
+
+    parser.add_argument('--switch_training', type=str2bool, default=True)
+    parser.add_argument('--switch_training_interval', type=int, default=5)
 
     args = parser.parse_args()
 
