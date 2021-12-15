@@ -245,7 +245,10 @@ def train_target(args):
             v.requires_grad = False
 
     if args.ssl_task in ['simclr', 'crs']:
-        ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
+        if args.use_new_ntxent:
+            ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
+        else:
+            ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
     elif args.ssl_task in ['supcon', 'crsc']:
         ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
     elif args.ssl_task == 'ls_supcon':
@@ -403,20 +406,24 @@ def train_target(args):
 
         if args.ssl_weight > 0:
             if args.ssl_before_btn:
-                z1 = netH(f1, args.norm_feat)
+                z1 = netH(f1, args.norm_feat)[cls_thres_idx]
                 if use_second_pass:
-                    z2 = netH(f2, args.norm_feat)
+                    z2 = netH(f2, args.norm_feat)[cls_thres_idx]
                 if use_third_pass:
-                    z3 = netH(f3, args.norm_feat)
+                    z3 = netH(f3, args.norm_feat)[cls_thres_idx]
             else:
-                z1 = netH(b1, args.norm_feat)
+                z1 = netH(b1, args.norm_feat)[cls_thres_idx]
                 if use_second_pass:
-                    z2 = netH(b2, args.norm_feat)
+                    z2 = netH(b2, args.norm_feat)[cls_thres_idx]
                 if use_third_pass:
-                    z3 = netH(b3, args.norm_feat)
+                    z3 = netH(b3, args.norm_feat)[cls_thres_idx]
 
             if args.ssl_task == 'simclr':
-                ssl_loss = ssl_loss_fn(z1, z2)
+                if args.use_new_ntxent:
+                    z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
+                    ssl_loss = ssl_loss_fn(z)
+                else:
+                    ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
                 z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
                 pl = mem_label[tar_idx]
@@ -429,7 +436,11 @@ def train_target(args):
                 pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z, pl)
             elif args.ssl_task == 'crs':
-                ssl_loss = ssl_loss_fn(z1, z3)
+                if args.use_new_ntxent:
+                    z = torch.cat([z1.unsqueeze(1), z3.unsqueeze(1)], dim=1)
+                    ssl_loss = ssl_loss_fn(z)
+                else:
+                    ssl_loss = ssl_loss_fn(z1, z3)
             classifier_loss += args.ssl_weight * ssl_loss
 
         if args.cr_weight > 0:
@@ -658,6 +669,8 @@ if __name__ == "__main__":
     parser.add_argument('--dist_thres_start', type=float, default=2.0)
     parser.add_argument('--dist_thres_end', type=float, default=2.0)
     parser.add_argument('--dist_thres_mode', type=str, choices=['none', 'const', 'linear'])
+
+    parser.add_argument('--use_new_ntxent', type=str2bool, default=True)
 
     args = parser.parse_args()
 
