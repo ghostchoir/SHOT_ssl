@@ -668,7 +668,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--dist_thres_start', type=float, default=2.0)
     parser.add_argument('--dist_thres_end', type=float, default=2.0)
-    parser.add_argument('--dist_thres_mode', type=str, choices=['none', 'const', 'linear'])
+    parser.add_argument('--dist_thres_mode', type=str, choices=['none', 'const', 'linear'], default='none')
 
     parser.add_argument('--use_new_ntxent', type=str2bool, default=True)
 
