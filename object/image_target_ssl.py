@@ -190,7 +190,7 @@ def train_target(args):
                                        bias=args.classifier_bias, temp=args.angular_temp)
 
     modelpath = args.output_dir_src + '/source_F.pt'
-    netF.load_state_dict(torch.load(modelpath))
+    netF.load_state_dict(torch.load(modelpath), strict=False)
     modelpath = args.output_dir_src + '/source_H.pt'
     netH.load_state_dict(torch.load(modelpath), strict=False)
     try:
@@ -199,7 +199,7 @@ def train_target(args):
     except:
         print('Skipped loading btn for version compatibility')
     modelpath = args.output_dir_src + '/source_C.pt'
-    netC.load_state_dict(torch.load(modelpath))
+    netC.load_state_dict(torch.load(modelpath), strict=False)
     netC.eval()
     for k, v in netC.named_parameters():
         v.requires_grad = False
@@ -594,7 +594,7 @@ if __name__ == "__main__":
     parser.add_argument('--cr_weight', type=float, default=0.0)
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce', 'kl'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
-    parser.add_argument('--cr_threshold', type=float, default=-1.0)
+    parser.add_argument('--cr_threshold', type=float, default=0.0)
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=0.07)
