@@ -170,7 +170,7 @@ def train_target(args):
             netF = network.ResCifarBase(26, norm_layer=norm_layer)
             args.bottleneck = netF.in_features // 2
         else:
-            netF = network.ResBase(res_name=args.net)
+            netF = network.ResBase(res_name=args.net, args=args)
     elif args.net[0:3] == 'vgg':
         netF = network.VGGBase(vgg_name=args.net)
 
