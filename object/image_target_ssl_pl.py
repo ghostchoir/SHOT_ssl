@@ -426,14 +426,14 @@ def train_target(args):
                     ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
                 z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
-                pl = mem_label[tar_idx]
+                pl = mem_label[tar_idx][cls_thres_idx]
                 ssl_loss = ssl_loss_fn(z, pl)
             elif args.ssl_task == 'ls_supcon':
-                pl = mem_label[tar_idx]
+                pl = mem_label[tar_idx][cls_thres_idx]
                 ssl_loss = ssl_loss_fn(z1, z2, pl).squeeze()
             elif args.ssl_task == 'crsc':
                 z = torch.cat([z1.unsqueeze(1), z3.unsqueeze(1)], dim=1)
-                pl = mem_label[tar_idx]
+                pl = mem_label[tar_idx][cls_thres_idx]
                 ssl_loss = ssl_loss_fn(z, pl)
             elif args.ssl_task == 'crs':
                 if args.use_new_ntxent:
