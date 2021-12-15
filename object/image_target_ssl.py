@@ -621,6 +621,11 @@ if __name__ == "__main__":
     parser.add_argument('--duplicated', default=False, type=str2bool)
     parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
 
+    parser.add_argument('--dropout_1', type=float, default=0)
+    parser.add_argument('--dropout_2', type=float, default=0)
+    parser.add_argument('--dropout_3', type=float, default=0)
+    parser.add_argument('--dropout_4', type=float, default=0)
+
     args = parser.parse_args()
 
     args.pretrained = not args.nopretrained
