@@ -50,7 +50,7 @@ res_dict = {"resnet18":models.resnet18, "resnet34":models.resnet34, "resnet50":m
 "resnet101":models.resnet101, "resnet152":models.resnet152, "resnext50":models.resnext50_32x4d, "resnext101":models.resnext101_32x8d}
 
 class ResBase(nn.Module):
-    def __init__(self, res_name, pretrained=True):
+    def __init__(self, res_name, pretrained=True, args=None):
         super(ResBase, self).__init__()
         model_resnet = res_dict[res_name](pretrained=pretrained)
         self.conv1 = model_resnet.conv1
@@ -58,9 +58,25 @@ class ResBase(nn.Module):
         self.relu = model_resnet.relu
         self.maxpool = model_resnet.maxpool
         self.layer1 = model_resnet.layer1
+        if args.dropout_1 > 0:
+            self.drop1 = nn.Dropout2d(p=args.dropout_1)
+        else:
+            self.drop1 = nn.Identity()
         self.layer2 = model_resnet.layer2
+        if args.dropout_2 > 0:
+            self.drop2 = nn.Dropout2d(p=args.dropout_2)
+        else:
+            self.drop2 = nn.Identity()
         self.layer3 = model_resnet.layer3
+        if args.dropout_3 > 0:
+            self.drop3 = nn.Dropout2d(p=args.dropout_3)
+        else:
+            self.drop3 = nn.Identity()
         self.layer4 = model_resnet.layer4
+        if args.dropout_4 > 0:
+            self.drop4 = nn.Dropout2d(p=args.dropout_4)
+        else:
+            self.drop4 = nn.Identity()
         self.avgpool = model_resnet.avgpool
         self.in_features = model_resnet.fc.in_features
 
@@ -70,9 +86,13 @@ class ResBase(nn.Module):
         x = self.relu(x)
         x = self.maxpool(x)
         x = self.layer1(x)
+        x = self.drop1(x)
         x = self.layer2(x)
+        x = self.drop2(x)
         x = self.layer3(x)
+        x = self.drop3(x)
         x = self.layer4(x)
+        x = self.drop4(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         return x

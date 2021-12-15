@@ -245,7 +245,7 @@ def train_source(args):
             netF = network.ResCifarBase(26, norm_layer=norm_layer)
             args.bottleneck = netF.in_features // 2
         else:
-            netF = network.ResBase(res_name=args.net)
+            netF = network.ResBase(res_name=args.net, args=args)
     elif args.net[0:3] == 'vgg':
         netF = network.VGGBase(vgg_name=args.net)
 
@@ -504,7 +504,7 @@ def test_target(args):
         if '26' in args.net:
             netF = network.ResCifarBase(26, norm_layer=norm_layer)
         else:
-            netF = network.ResBase(res_name=args.net)
+            netF = network.ResBase(res_name=args.net, args=args)
     elif args.net[0:3] == 'vgg':
         netF = network.VGGBase(vgg_name=args.net)
     
@@ -625,6 +625,12 @@ if __name__ == "__main__":
     parser.add_argument('--nograyscale', action='store_true')
     parser.add_argument('--nogaussblur', action='store_true')
     parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
+
+    parser.add_argument('--dropout_1', type=float, default=0.2)
+    parser.add_argument('--dropout_2', type=float, default=0.2)
+    parser.add_argument('--dropout_3', type=float, default=0.2)
+    parser.add_argument('--dropout_4', type=float, default=0.2)
+
     args = parser.parse_args()
     
     args.pretrained = not args.nopretrained

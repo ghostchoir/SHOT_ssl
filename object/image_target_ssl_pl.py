@@ -182,7 +182,7 @@ def train_target(args):
             netF = network.ResCifarBase(26, norm_layer=norm_layer)
             args.bottleneck = netF.in_features // 2
         else:
-            netF = network.ResBase(res_name=args.net)
+            netF = network.ResBase(res_name=args.net, args=args)
     elif args.net[0:3] == 'vgg':
         netF = network.VGGBase(vgg_name=args.net)
 
@@ -202,7 +202,7 @@ def train_target(args):
                                        bias=args.classifier_bias, temp=args.angular_temp)
 
     modelpath = args.output_dir_src + '/source_F.pt'
-    netF.load_state_dict(torch.load(modelpath))
+    netF.load_state_dict(torch.load(modelpath), strict=False)
     modelpath = args.output_dir_src + '/source_H.pt'
     netH.load_state_dict(torch.load(modelpath), strict=False)
     try:
@@ -211,7 +211,7 @@ def train_target(args):
     except:
         print('Skipped loading btn for version compatibility')
     modelpath = args.output_dir_src + '/source_C.pt'
-    netC.load_state_dict(torch.load(modelpath))
+    netC.load_state_dict(torch.load(modelpath), strict=False)
     netC.eval()
     for k, v in netC.named_parameters():
         v.requires_grad = False
@@ -671,6 +671,11 @@ if __name__ == "__main__":
     parser.add_argument('--dist_thres_mode', type=str, choices=['none', 'const', 'linear'])
 
     parser.add_argument('--use_new_ntxent', type=str2bool, default=True)
+
+    parser.add_argument('--dropout_1', type=float, default=0)
+    parser.add_argument('--dropout_2', type=float, default=0)
+    parser.add_argument('--dropout_3', type=float, default=0)
+    parser.add_argument('--dropout_4', type=float, default=0)
 
     args = parser.parse_args()
 
