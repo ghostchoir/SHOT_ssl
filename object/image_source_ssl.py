@@ -159,7 +159,8 @@ def data_load(args):
         dsets["source_tr"] = ImageList(tr_txt, transform=image_train(args))
         cls_dist = [0] * args.class_num
         for img in dsets["source_tr"].imgs:
-            _, cls = int(img)
+            _, cls = img
+            cls = int(cls)
             cls_dist[cls] += 1 / len(dsets["source_tr"].imgs)
 
         cls_dist_inv = [1 / p for p in cls_dist]
