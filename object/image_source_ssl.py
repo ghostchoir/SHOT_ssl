@@ -419,6 +419,7 @@ def train_source(args):
 
         if args.ce_weighting:
             w = torch.Tensor(args.ce_weight).cuda()
+            w.requires_grad = False
             if args.smooth == 0:
                 classifier_loss = nn.CrossEntropyLoss(weight=w)(outputs_source, labels_source)
             else:
