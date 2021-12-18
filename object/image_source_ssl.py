@@ -422,14 +422,14 @@ def train_source(args):
             if args.smooth == 0:
                 classifier_loss = nn.CrossEntropyLoss(weight=w)(outputs_source, labels_source)
             else:
-                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth, weight=w)(
-                    outputs_source, labels_source)
+                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth,
+                                                          weight=w).cuda()(outputs_source, labels_source)
             if args.cls3:
                 if args.smooth == 0:
                     classifier_loss += nn.CrossEntropyLoss(weight=w)(c3, labels_source)
                 else:
-                    classifier_loss += CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth, weight=w)(
-                        c3, labels_source)
+                    classifier_loss += CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth,
+                                                               weight=w).cuda()(c3, labels_source)
         else:
             if args.smooth == 0:
                 classifier_loss = nn.CrossEntropyLoss()(outputs_source, labels_source)
