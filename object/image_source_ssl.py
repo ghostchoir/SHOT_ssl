@@ -418,18 +418,18 @@ def train_source(args):
                 raise NotImplementedError
 
         if args.ce_weighting:
-            w = torch.Tensor(args.ce_weight)
+            w = torch.Tensor(args.ce_weight).cuda()
             if args.smooth == 0:
                 classifier_loss = nn.CrossEntropyLoss(weight=w)(outputs_source, labels_source)
             else:
                 classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth,
-                                                          weight=w).cuda()(outputs_source, labels_source)
+                                                          weight=w)(outputs_source, labels_source)
             if args.cls3:
                 if args.smooth == 0:
                     classifier_loss += nn.CrossEntropyLoss(weight=w)(c3, labels_source)
                 else:
                     classifier_loss += CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth,
-                                                               weight=w).cuda()(c3, labels_source)
+                                                               weight=w)(c3, labels_source)
         else:
             if args.smooth == 0:
                 classifier_loss = nn.CrossEntropyLoss()(outputs_source, labels_source)
