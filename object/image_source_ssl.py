@@ -19,7 +19,6 @@ from scipy.spatial.distance import cdist
 from sklearn.metrics import confusion_matrix
 from sklearn.cluster import KMeans
 
-
 corruptions = ['gaussian_noise', 'shot_noise', 'impulse_noise', 'defocus_blur', 'glass_blur',
                'motion_blur', 'zoom_blur', 'snow', 'frost', 'fog',
                'brightness', 'contrast', 'elastic_transform', 'pixelate', 'jpeg_compression']
@@ -39,6 +38,7 @@ def op_copy(optimizer):
         param_group['lr0'] = param_group['lr']
     return optimizer
 
+
 def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
     if args.scheduler == 'default':
         decay = (1 + gamma * iter_num / max_iter) ** (-power)
@@ -47,7 +47,7 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
         if iter_num < warmup_iter:
             decay = iter_num / warmup_iter
         else:
-            decay = np.cos((iter_num - warmup_iter) * np.pi / (2*(max_iter - warmup_iter)))
+            decay = np.cos((iter_num - warmup_iter) * np.pi / (2 * (max_iter - warmup_iter)))
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr0'] * decay
         param_group['weight_decay'] = args.weight_decay
@@ -55,108 +55,129 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
         param_group['nesterov'] = True
     return optimizer
 
-def data_load(args): 
+
+def data_load(args):
     ## prepare data
     dsets = {}
     dset_loaders = {}
     train_bs = args.batch_size
-    
+
     if args.dset == 'CIFAR-10-C':
         try:
-            dsets["source_tr"] = datasets.CIFAR10(root=args.folder+'CIFAR-10-C',
+            dsets["source_tr"] = datasets.CIFAR10(root=args.folder + 'CIFAR-10-C',
                                                   train=True,
                                                   download=False,
                                                   transform=cifar_train(args)
-                                                 )
+                                                  )
         except:
-            dsets["source_tr"] = datasets.CIFAR10(root=args.folder+'CIFAR-10-C',
+            dsets["source_tr"] = datasets.CIFAR10(root=args.folder + 'CIFAR-10-C',
                                                   train=True,
                                                   download=True,
                                                   transform=cifar_train(args)
-                                                 )
-        dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=True)
-        dsets["source_te"] = datasets.CIFAR10(root=args.folder+'CIFAR-10-C',
+                                                  )
+        dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True,
+                                               num_workers=args.worker, drop_last=True)
+        dsets["source_te"] = datasets.CIFAR10(root=args.folder + 'CIFAR-10-C',
                                               train=False,
                                               download=False,
                                               transform=cifar_test()
-                                             )
-        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
+                                              )
+        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs * 4, shuffle=False,
+                                               num_workers=args.worker, drop_last=False)
         dsets["test"] = cifar10c_dset(args)
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
-    
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+                                          num_workers=args.worker, drop_last=False)
+
     elif args.dset == 'CIFAR-100-C':
         try:
-            dsets["source_tr"] = datasets.CIFAR100(root=args.folder+'CIFAR-100-C',
-                                                  train=True,
-                                                  download=False,
-                                                  transform=cifar_train(args)
-                                                 )
+            dsets["source_tr"] = datasets.CIFAR100(root=args.folder + 'CIFAR-100-C',
+                                                   train=True,
+                                                   download=False,
+                                                   transform=cifar_train(args)
+                                                   )
         except:
-            dsets["source_tr"] = datasets.CIFAR100(root=args.folder+'CIFAR-100-C',
-                                                  train=True,
-                                                  download=True,
-                                                  transform=cifar_train(args)
-                                                 )
-        dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=True)
-        dsets["source_te"] = datasets.CIFAR100(root=args.folder+'CIFAR-100-C',
-                                              train=False,
-                                              download=False,
-                                              transform=cifar_test()
-                                             )
-        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
+            dsets["source_tr"] = datasets.CIFAR100(root=args.folder + 'CIFAR-100-C',
+                                                   train=True,
+                                                   download=True,
+                                                   transform=cifar_train(args)
+                                                   )
+        dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True,
+                                               num_workers=args.worker, drop_last=True)
+        dsets["source_te"] = datasets.CIFAR100(root=args.folder + 'CIFAR-100-C',
+                                               train=False,
+                                               download=False,
+                                               transform=cifar_test()
+                                               )
+        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs * 4, shuffle=False,
+                                               num_workers=args.worker, drop_last=False)
         dsets["test"] = cifar100c_dset(args)
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
-        
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+                                          num_workers=args.worker, drop_last=False)
+
     else:
         txt_src = open(args.s_dset_path).readlines()
         txt_test = open(args.test_dset_path).readlines()
-    
+
         if not args.da == 'uda':
             label_map_s = {}
             for i in range(len(args.src_classes)):
                 label_map_s[args.src_classes[i]] = i
-            
+
             new_src = []
             for i in range(len(txt_src)):
                 rec = txt_src[i]
                 reci = rec.strip().split(' ')
                 if int(reci[1]) in args.src_classes:
-                    line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'   
+                    line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'
                     new_src.append(line)
             txt_src = new_src.copy()
-    
+
             new_tar = []
             for i in range(len(txt_test)):
                 rec = txt_test[i]
                 reci = rec.strip().split(' ')
                 if int(reci[1]) in args.tar_classes:
                     if int(reci[1]) in args.src_classes:
-                        line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'   
+                        line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'
                         new_tar.append(line)
                     else:
-                        line = reci[0] + ' ' + str(len(label_map_s)) + '\n'   
+                        line = reci[0] + ' ' + str(len(label_map_s)) + '\n'
                         new_tar.append(line)
             txt_test = new_tar.copy()
-    
+
         if args.trte == "val":
             dsize = len(txt_src)
-            tr_size = int(args.split_ratio*dsize)
+            tr_size = int(args.split_ratio * dsize)
             # print(dsize, tr_size, dsize - tr_size)
             tr_txt, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
         else:
             dsize = len(txt_src)
-            tr_size = int(args.split_ratio*dsize)
+            tr_size = int(args.split_ratio * dsize)
             _, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
             tr_txt = txt_src
-            
+
         dsets["source_tr"] = ImageList(tr_txt, transform=image_train(args))
-        dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True, num_workers=args.worker, drop_last=False if args.ssl_task=='none' else True)
+        cls_dist = [0] * args.class_num
+        for img in dsets["source_tr"].imgs:
+            _, cls = int(img)
+            cls_dist[cls] += 1 / len(dsets["source_tr"].imgs)
+
+        cls_dist_inv = [1 / p for p in cls_dist]
+        min_dist = min(cls_dist_inv)
+        cls_dist_inv_norm = [p / min_dist for p in cls_dist_inv]
+        args.ce_weight = cls_dist_inv_norm
+        dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True,
+                                               num_workers=args.worker,
+                                               drop_last=False if args.ssl_task == 'none' else True)
         dsets["source_te"] = ImageList(te_txt, transform=image_test(args))
-        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs, shuffle=False, num_workers=args.worker, drop_last=False)
+        dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs, shuffle=False,
+                                               num_workers=args.worker, drop_last=False)
         dsets["test"] = ImageList(txt_test, transform=image_test(args))
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs*4, shuffle=False, num_workers=args.worker, drop_last=False)
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+                                          num_workers=args.worker, drop_last=False)
 
     return dset_loaders
+
 
 def cal_acc(loader, netF, netH, netB, netC, args, flag=False):
     start_test = True
@@ -180,16 +201,17 @@ def cal_acc(loader, netF, netH, netB, netC, args, flag=False):
     _, predict = torch.max(all_output, 1)
     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
     mean_ent = torch.mean(loss.Entropy(all_output)).cpu().data.item()
-   
+
     if flag:
         matrix = confusion_matrix(all_label, torch.squeeze(predict).float())
-        acc = matrix.diagonal()/matrix.sum(axis=1) * 100
+        acc = matrix.diagonal() / matrix.sum(axis=1) * 100
         aacc = acc.mean()
         aa = [str(np.round(i, 2)) for i in acc]
         acc = ' '.join(aa)
         return aacc, acc
     else:
-        return accuracy*100, mean_ent
+        return accuracy * 100, mean_ent
+
 
 def cal_acc_oda(loader, netF, netB, netC):
     start_test = True
@@ -218,18 +240,19 @@ def cal_acc_oda(loader, netF, netB, netC):
     ent = torch.sum(-all_output * torch.log(all_output + args.epsilon), dim=1) / np.log(args.class_num)
     ent = ent.float().cpu()
     initc = np.array([[0], [1]])
-    kmeans = KMeans(n_clusters=2, random_state=0, init=initc, n_init=1).fit(ent.reshape(-1,1))
+    kmeans = KMeans(n_clusters=2, random_state=0, init=initc, n_init=1).fit(ent.reshape(-1, 1))
     threshold = (kmeans.cluster_centers_).mean()
 
-    predict[ent>threshold] = args.class_num
+    predict[ent > threshold] = args.class_num
     matrix = confusion_matrix(all_label, torch.squeeze(predict).float())
-    matrix = matrix[np.unique(all_label).astype(int),:]
+    matrix = matrix[np.unique(all_label).astype(int), :]
 
-    acc = matrix.diagonal()/matrix.sum(axis=1) * 100
+    acc = matrix.diagonal() / matrix.sum(axis=1) * 100
     unknown_acc = acc[-1:].item()
 
     return np.mean(acc[:-1]), np.mean(acc), unknown_acc
     # return np.mean(acc), np.mean(acc[:-1])
+
 
 def train_source(args):
     dset_loaders = data_load(args)
@@ -239,6 +262,7 @@ def train_source(args):
     elif args.norm_layer == 'groupnorm':
         def gn_helper(planes):
             return nn.GroupNorm(8, planes)
+
         norm_layer = gn_helper
     if args.net[0:3] == 'res':
         if '26' in args.net:
@@ -254,7 +278,8 @@ def train_source(args):
     else:
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
-        netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
+        netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
+                                       bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
         netC = network.feat_classifier(type=args.layer,
                                        class_num=args.class_num,
                                        bottleneck_dim=args.bottleneck,
@@ -267,7 +292,7 @@ def train_source(args):
                                        bottleneck_dim=netF.in_features,
                                        bias=args.classifier_bias,
                                        temp=args.angular_temp)
-    
+
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
         netH = nn.DataParallel(netH).cuda()
@@ -278,18 +303,18 @@ def train_source(args):
         netH.cuda()
         netB.cuda()
         netC.cuda()
-    
+
     param_group = []
     learning_rate = args.lr
     for k, v in netF.named_parameters():
-        param_group += [{'params': v, 'lr': learning_rate*0.1}]
+        param_group += [{'params': v, 'lr': learning_rate * 0.1}]
     for k, v in netH.named_parameters():
         param_group += [{'params': v, 'lr': learning_rate}]
     for k, v in netB.named_parameters():
         param_group += [{'params': v, 'lr': learning_rate}]
     for k, v in netC.named_parameters():
-        param_group += [{'params': v, 'lr': learning_rate}]   
-        
+        param_group += [{'params': v, 'lr': learning_rate}]
+
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
 
@@ -302,7 +327,7 @@ def train_source(args):
     netH.train()
     netB.train()
     netC.train()
-    
+
     if args.ssl_task in ['simclr', 'crs']:
         ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
     elif args.ssl_task in ['supcon', 'crsc']:
@@ -391,16 +416,32 @@ def train_source(args):
             else:
                 raise NotImplementedError
 
-        if args.smooth == 0:
-            classifier_loss = nn.CrossEntropyLoss()(outputs_source, labels_source)
-        else:
-            classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(outputs_source, labels_source)
-
-        if args.cls3:
+        if args.ce_weighting:
+            w = torch.Tensor(args.ce_weight)
             if args.smooth == 0:
-                classifier_loss = nn.CrossEntropyLoss()(c3, labels_source)
+                classifier_loss = nn.CrossEntropyLoss(weight=w)(outputs_source, labels_source)
             else:
-                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(c3, labels_source)
+                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth, weight=w)(
+                    outputs_source, labels_source)
+            if args.cls3:
+                if args.smooth == 0:
+                    classifier_loss += nn.CrossEntropyLoss(weight=w)(c3, labels_source)
+                else:
+                    classifier_loss += CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth, weight=w)(
+                        c3, labels_source)
+        else:
+            if args.smooth == 0:
+                classifier_loss = nn.CrossEntropyLoss()(outputs_source, labels_source)
+            else:
+                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(
+                    outputs_source, labels_source)
+
+            if args.cls3:
+                if args.smooth == 0:
+                    classifier_loss += nn.CrossEntropyLoss()(c3, labels_source)
+                else:
+                    classifier_loss += CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(c3,
+                                                                                                                labels_source)
 
         if args.ssl_weight > 0:
             if args.ssl_before_btn:
@@ -433,7 +474,7 @@ def train_source(args):
 
         if args.cr_weight > 0:
             try:
-                cr_loss = dist(f_hard[conf<=args.cr_threshold], f_weak[conf<=args.cr_threshold]).mean()
+                cr_loss = dist(f_hard[conf <= args.cr_threshold], f_weak[conf <= args.cr_threshold]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
@@ -442,9 +483,9 @@ def train_source(args):
                 cr_loss = torch.tensor(0.0).cuda()
         else:
             cr_loss = torch.tensor(0.0).cuda()
-        
+
         loss = classifier_loss + args.ssl_weight * ssl_loss + args.cr_weight * cr_loss
-        
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -454,19 +495,20 @@ def train_source(args):
             netH.eval()
             netB.eval()
             netC.eval()
-            if args.dset=='visda-c':
+            if args.dset == 'visda-c':
                 acc_s_te, acc_list = cal_acc(dset_loaders['source_te'], netF, netH, netB, netC, args, True)
-                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name_src, iter_num, max_iter, acc_s_te) + '\n' + acc_list
+                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name_src, iter_num, max_iter,
+                                                                            acc_s_te) + '\n' + acc_list
             else:
                 acc_s_te, _ = cal_acc(dset_loaders['source_te'], netF, netH, netB, netC, args, False)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name_src, iter_num, max_iter, acc_s_te)
             args.out_file.write(log_str + '\n')
             args.out_file.flush()
-            print(log_str+'\n')
+            print(log_str + '\n')
 
             if acc_s_te >= acc_init:
                 acc_init = acc_s_te
-                           
+
                 if args.dataparallel:
                     best_netF = netF.module.state_dict()
                     best_netH = netH.module.state_dict()
@@ -482,14 +524,14 @@ def train_source(args):
             netH.train()
             netB.train()
             netC.train()
-                
-    
+
     torch.save(best_netF, osp.join(args.output_dir_src, "source_F.pt"))
     torch.save(best_netH, osp.join(args.output_dir_src, "source_H.pt"))
     torch.save(best_netB, osp.join(args.output_dir_src, "source_B.pt"))
     torch.save(best_netC, osp.join(args.output_dir_src, "source_C.pt"))
 
     return netF, netH, netB, netC
+
 
 def test_target(args):
     dset_loaders = data_load(args)
@@ -499,6 +541,7 @@ def test_target(args):
     elif args.norm_layer == 'groupnorm':
         def gn_helper(planes):
             return nn.GroupNorm(8, planes)
+
         norm_layer = gn_helper
     if args.net[0:3] == 'res':
         if '26' in args.net:
@@ -507,31 +550,33 @@ def test_target(args):
             netF = network.ResBase(res_name=args.net, args=args)
     elif args.net[0:3] == 'vgg':
         netF = network.VGGBase(vgg_name=args.net)
-    
+
     if args.ssl_before_btn:
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
     else:
         netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
-        netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features, bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
-        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=args.bottleneck, bias=args.classifier_bias)
+        netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
+                                       bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
+        netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=args.bottleneck,
+                                       bias=args.classifier_bias)
     else:
         netB = nn.Identity()
-        netC = network.feat_classifier(type=args.layer, class_num = args.class_num, bottleneck_dim=netF.in_features, bias=args.classifier_bias)
-    
-    
-    args.modelpath = args.output_dir_src + '/source_F.pt'   
+        netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=netF.in_features,
+                                       bias=args.classifier_bias)
+
+    args.modelpath = args.output_dir_src + '/source_F.pt'
     netF.load_state_dict(torch.load(args.modelpath))
-    args.modelpath = args.output_dir_src + '/source_H.pt'   
+    args.modelpath = args.output_dir_src + '/source_H.pt'
     netH.load_state_dict(torch.load(args.modelpath))
     try:
         args.modelpath = args.output_dir_src + '/source_B.pt'
         netB.load_state_dict(torch.load(args.modelpath))
     except:
         print('Skipped loading btn for version compatibility')
-    args.modelpath = args.output_dir_src + '/source_C.pt'   
+    args.modelpath = args.output_dir_src + '/source_C.pt'
     netC.load_state_dict(torch.load(args.modelpath))
-    
+
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
         netH = nn.DataParallel(netH).cuda()
@@ -542,7 +587,7 @@ def test_target(args):
         netH.cuda()
         netB.cuda()
         netC.cuda()
-    
+
     netF.eval()
     netH.eval()
     netB.eval()
@@ -550,7 +595,9 @@ def test_target(args):
 
     if args.da == 'oda':
         acc_os1, acc_os2, acc_unknown = cal_acc_oda(dset_loaders['test'], netF, netH, netB, netC)
-        log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}% / {:.2f}% / {:.2f}%'.format(args.trte, args.name, acc_os2, acc_os1, acc_unknown)
+        log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}% / {:.2f}% / {:.2f}%'.format(args.trte, args.name,
+                                                                                            acc_os2, acc_os1,
+                                                                                            acc_unknown)
     else:
         if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
             acc, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
@@ -563,11 +610,13 @@ def test_target(args):
     args.out_file.flush()
     print(log_str)
 
+
 def print_args(args):
     s = "==========================================\n"
     for arg, content in args.__dict__.items():
         s += "{}:{}\n".format(arg, content)
     return s
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SHOT')
@@ -583,7 +632,8 @@ if __name__ == "__main__":
     parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
     parser.add_argument('--worker', type=int, default=8, help="number of workers")
     parser.add_argument('--dset', type=str, default='office-home',
-                        choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C', 'image-clef'])
+                        choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C',
+                                 'image-clef'])
     parser.add_argument('--level', type=int, default=5)
     parser.add_argument('--folder', type=str, default='/SSD/euntae/data/')
     parser.add_argument('--lr', type=float, default=1e-2, help="learning rate")
@@ -595,11 +645,12 @@ if __name__ == "__main__":
     parser.add_argument('--layer', type=str, default="wn", choices=["linear", "wn", "angular"])
     parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
-    parser.add_argument('--smooth', type=float, default=0.1)   
+    parser.add_argument('--smooth', type=float, default=0.1)
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda', 'oda'])
     parser.add_argument('--trte', type=str, default='val', choices=['full', 'val'])
-    parser.add_argument('--ssl_task', type=str, default='crsc', choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc', 'crs'])
+    parser.add_argument('--ssl_task', type=str, default='crsc',
+                        choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc', 'crs'])
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
@@ -631,8 +682,10 @@ if __name__ == "__main__":
     parser.add_argument('--dropout_3', type=float, default=0.2)
     parser.add_argument('--dropout_4', type=float, default=0.2)
 
+    parser.add_argument('--ce_weighting', type=str2bool, default=False)
+
     args = parser.parse_args()
-    
+
     args.pretrained = not args.nopretrained
     args.norm_img = not args.no_norm_img
     args.jitter = not args.nojitter
@@ -645,7 +698,7 @@ if __name__ == "__main__":
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']
-        args.class_num = 65 
+        args.class_num = 65
     if args.dset == 'office':
         names = ['amazon', 'dslr', 'webcam']
         args.class_num = 31
@@ -677,7 +730,7 @@ if __name__ == "__main__":
     random.seed(SEED)
     # torch.backends.cudnn.deterministic = True
 
-    folder = args.folder   
+    folder = args.folder
 
     if args.dset == 'office-home':
         if args.da == 'pda':
@@ -695,17 +748,17 @@ if __name__ == "__main__":
     else:
         args.output_dir_src = osp.join(args.output, args.da, args.dset, names[args.s][0].upper())
         args.name_src = names[args.s][0].upper()
-        
+
         args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
         args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
-        
+
     if not osp.exists(args.output_dir_src):
         os.system('mkdir -p ' + args.output_dir_src)
     if not osp.exists(args.output_dir_src):
         os.mkdir(args.output_dir_src)
 
     args.out_file = open(osp.join(args.output_dir_src, 'log.txt'), 'w')
-    args.out_file.write(print_args(args)+'\n')
+    args.out_file.write(print_args(args) + '\n')
     args.out_file.flush()
     train_source(args)
 
@@ -719,11 +772,11 @@ if __name__ == "__main__":
                 continue
             args.t = i
             args.name = names[args.s][0].upper() + names[args.t][0].upper()
-    
+
             folder = args.folder
             args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
             args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
-    
+
             if args.dset == 'office-home':
                 if args.disable_aug_for_shape:
                     if args.s in [1, 2]:

@@ -61,13 +61,14 @@ class CrossEntropyLabelSmooth(nn.Module):
         epsilon (float): weight.
     """
 
-    def __init__(self, num_classes, epsilon=0.1, use_gpu=True, reduction=True):
+    def __init__(self, num_classes, epsilon=0.1, use_gpu=True, reduction=True, weight=None):
         super(CrossEntropyLabelSmooth, self).__init__()
         self.num_classes = num_classes
         self.epsilon = epsilon
         self.use_gpu = use_gpu
         self.reduction = reduction
         self.logsoftmax = nn.LogSoftmax(dim=1)
+        self.weight = weight
 
     def forward(self, inputs, targets):
         """
@@ -78,10 +79,17 @@ class CrossEntropyLabelSmooth(nn.Module):
         log_probs = self.logsoftmax(inputs)
         targets = torch.zeros(log_probs.size()).scatter_(1, targets.unsqueeze(1).cpu(), 1)
         if self.use_gpu: targets = targets.cuda()
-        targets = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
-        loss = (- targets * log_probs).sum(dim=1)
+        targets_ls = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
+        loss = (- targets_ls * log_probs).sum(dim=1)
+        if self.weights is not None:
+            w = self.weights.repeat([inputs.size(0), 1])
+            w = torch.gather(w, 1, targets).squeeze()
+            loss = w * loss
         if self.reduction:
-            return loss.mean()
+            if self.weights is None:
+                return loss.mean()
+            else:
+                return loss / torch.sum(w)
         else:
             return loss
         return loss
