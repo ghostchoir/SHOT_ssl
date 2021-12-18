@@ -81,12 +81,12 @@ class CrossEntropyLabelSmooth(nn.Module):
         if self.use_gpu: targets = targets.cuda()
         targets_ls = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
         loss = (- targets_ls * log_probs).sum(dim=1)
-        if self.weights is not None:
-            w = self.weights.repeat([inputs.size(0), 1])
+        if self.weight is not None:
+            w = self.weight.repeat([inputs.size(0), 1])
             w = torch.gather(w, 1, targets).squeeze()
             loss = w * loss
         if self.reduction:
-            if self.weights is None:
+            if self.weight is None:
                 return loss.mean()
             else:
                 return loss / torch.sum(w)
