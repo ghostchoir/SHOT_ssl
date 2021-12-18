@@ -170,7 +170,7 @@ def train_target(args):
             netF = network.ResCifarBase(26, norm_layer=norm_layer)
             args.bottleneck = netF.in_features // 2
         else:
-            netF = network.ResBase(res_name=args.net)
+            netF = network.ResBase(res_name=args.net, args=args)
     elif args.net[0:3] == 'vgg':
         netF = network.VGGBase(vgg_name=args.net)
 
@@ -620,6 +620,11 @@ if __name__ == "__main__":
     parser.add_argument('--nogaussblur', action='store_true')
     parser.add_argument('--duplicated', default=False, type=str2bool)
     parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
+
+    parser.add_argument('--dropout_1', type=float, default=0)
+    parser.add_argument('--dropout_2', type=float, default=0)
+    parser.add_argument('--dropout_3', type=float, default=0)
+    parser.add_argument('--dropout_4', type=float, default=0)
 
     args = parser.parse_args()
 
