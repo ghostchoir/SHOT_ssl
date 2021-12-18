@@ -82,7 +82,7 @@ class CrossEntropyLabelSmooth(nn.Module):
         targets_ls = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
         loss = (- targets_ls * log_probs).sum(dim=1)
         if self.weight is not None:
-            targets = targets.type(torch.LongTensor)
+            targets = targets.type(torch.LongTensor).unsqueeze(-1)
             w = self.weight.repeat([inputs.size(0), 1])
             w = torch.gather(w, 1, targets).squeeze()
             loss = w * loss
