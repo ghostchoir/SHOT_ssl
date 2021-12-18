@@ -90,7 +90,7 @@ class CrossEntropyLabelSmooth(nn.Module):
             if self.weight is None:
                 return loss.mean()
             else:
-                return loss / torch.sum(w)
+                return (loss / torch.sum(w)).mean()
         else:
             return loss
         return loss
