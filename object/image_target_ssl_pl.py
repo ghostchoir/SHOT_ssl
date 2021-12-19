@@ -381,11 +381,11 @@ def train_target(args):
                     pred[cls_thres_idx])
             if args.cls3:
                 if args.cls_smooth > 0:
-                    classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
+                    classifier_loss += CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
                         c3[cls_thres_idx],
                         pred[cls_thres_idx])
                 else:
-                    classifier_loss = nn.CrossEntropyLoss()(
+                    classifier_loss += nn.CrossEntropyLoss()(
                         c3[cls_thres_idx],
                         pred[cls_thres_idx])
             classifier_loss *= args.cls_par
@@ -554,8 +554,10 @@ def obtain_label(loader, netF, netH, netB, netC, args):
         all_fea = all_fea.float().cpu().numpy()
         K = all_output.size(1)
         aff = all_output.float().cpu().numpy()
-        initc = aff.transpose().dot(all_fea)
-        initc = initc / (1e-8 + aff.sum(axis=0)[:, None])
+        print('centroid survival rate', np.count_nonzero(aff >= args.centroid_threshold) / aff.size)
+        aff_thres = aff[aff >= args.centroid_threshold]
+        initc = aff_thres.transpose().dot(all_fea)
+        initc = initc / (1e-8 + aff_thres.sum(axis=0)[:, None])
         cls_count = np.eye(K)[predict].sum(axis=0)
         labelset = np.where(cls_count > args.threshold)
         labelset = labelset[0]
@@ -676,6 +678,8 @@ if __name__ == "__main__":
     parser.add_argument('--dropout_2', type=float, default=0)
     parser.add_argument('--dropout_3', type=float, default=0)
     parser.add_argument('--dropout_4', type=float, default=0)
+
+    parser.add_argument('--centroid_threshold', type=float, default=0.1)
 
     args = parser.parse_args()
 
