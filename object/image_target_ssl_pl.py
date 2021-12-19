@@ -555,9 +555,9 @@ def obtain_label(loader, netF, netH, netB, netC, args):
         K = all_output.size(1)
         aff = all_output.float().cpu().numpy()
         print('centroid survival rate', np.count_nonzero(aff >= args.centroid_threshold) / aff.size)
-        aff_thres = aff[aff >= args.centroid_threshold]
-        initc = aff_thres.transpose().dot(all_fea)
-        initc = initc / (1e-8 + aff_thres.sum(axis=0)[:, None])
+        aff[aff < args.centroid_threshold] = 0.0
+        initc = aff.transpose().dot(all_fea)
+        initc = initc / (1e-8 + aff.sum(axis=0)[:, None])
         cls_count = np.eye(K)[predict].sum(axis=0)
         labelset = np.where(cls_count > args.threshold)
         labelset = labelset[0]
