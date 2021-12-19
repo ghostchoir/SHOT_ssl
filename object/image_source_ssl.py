@@ -330,7 +330,10 @@ def train_source(args):
     netC.train()
 
     if args.ssl_task in ['simclr', 'crs']:
-        ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
+        if args.use_new_ntxent:
+            ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
+        else:
+            ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
     elif args.ssl_task in ['supcon', 'crsc']:
         ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
     elif args.ssl_task == 'ls_supcon':
@@ -460,7 +463,11 @@ def train_source(args):
                     z3 = netH(b3, args.norm_feat)
 
             if args.ssl_task in 'simclr':
-                ssl_loss = ssl_loss_fn(z1, z2)
+                if args.use_new_ntxent:
+                    z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
+                    ssl_loss = ssl_loss_fn(z)
+                else:
+                    ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
                 z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
                 ssl_loss = ssl_loss_fn(z, labels=labels_source)
@@ -470,7 +477,11 @@ def train_source(args):
                 z = torch.cat([z1.unsqueeze(1), z3.unsqueeze(1)], dim=1)
                 ssl_loss = ssl_loss_fn(z, labels_source)
             elif args.ssl_task == 'crs':
-                ssl_loss = ssl_loss_fn(z1, z3)
+                if args.use_new_ntxent:
+                    z = torch.cat([z1.unsqueeze(1), z3.unsqueeze(1)], dim=1)
+                    ssl_loss = ssl_loss_fn(z)
+                else:
+                    ssl_loss = ssl_loss_fn(z1, z3)
         else:
             ssl_loss = torch.tensor(0.0).cuda()
 
@@ -685,6 +696,8 @@ if __name__ == "__main__":
     parser.add_argument('--dropout_4', type=float, default=0.2)
 
     parser.add_argument('--ce_weighting', type=str2bool, default=False)
+
+    parser.add_argument('--use_new_ntxent', type=str2bool, default=True)
 
     args = parser.parse_args()
 
