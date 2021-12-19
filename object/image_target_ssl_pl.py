@@ -679,7 +679,7 @@ if __name__ == "__main__":
     parser.add_argument('--dropout_3', type=float, default=0)
     parser.add_argument('--dropout_4', type=float, default=0)
 
-    parser.add_argument('--centroid_threshold', type=float, default=0.1)
+    parser.add_argument('--centroid_threshold', type=float, default=0.0)
 
     args = parser.parse_args()
 
