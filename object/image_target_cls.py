@@ -298,7 +298,7 @@ def train_target(args):
 
     switch_training_iter = int(max_iter / args.switch_training_interval)
     # start from feat
-    curr_training_mode = 'cls'
+    curr_training_mode = 'feat'
 
     while iter_num < max_iter:
         try:
@@ -387,7 +387,7 @@ def train_target(args):
             else:
                 raise NotImplementedError
 
-        if args.cls_par > 0:
+        if args.cls_par > 0 and curr_training_mode == 'feat':
             # with torch.no_grad():
             #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
             #    conf = conf.cpu().numpy()
