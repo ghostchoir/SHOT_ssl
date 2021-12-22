@@ -549,7 +549,12 @@ def obtain_label(loader, netF, netH, netB, netC, args):
     args.out_file.flush()
     print(log_str + '\n')
 
-    return pred_label.astype('int'), conf.cpu().numpy(), initc, labelset
+    if args.initial_centroid == 'raw':
+        centroids = initc
+    elif args.initial_centroid == 'hard':
+        centroids = c
+
+    return pred_label.astype('int'), conf.cpu().numpy(), centroids, labelset
 
 
 def compute_pl(args, feature, centroid, labelset):
@@ -677,6 +682,7 @@ if __name__ == "__main__":
     parser.add_argument('--centroid_update_rule', type=str, choices=['pred_hard', 'pred_soft', 'dist_hard', 'dist_soft', 'none'],
                         default='dist_soft')
     parser.add_argument('--centroid_ema', type=float, default=0.99)
+    parser.add_argument('--initial_centroid', type=str, choices=['raw', 'hard'], default='raw')
 
     args = parser.parse_args()
 
