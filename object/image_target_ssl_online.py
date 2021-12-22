@@ -567,11 +567,11 @@ def update_centroid(args, feature, centroid, output, labelset):
     feature = feature.detach().float().cpu().numpy()
 
     if args.centroid_update_rule == 'pred_soft':
-        pls = output.cpu().numpy()
+        pls = output.detach().cpu().numpy()
         weighted_feats = pls.transpose().dot(feature)
         centroid = args.centroid_ema * centroid + (1 - args.centroid_ema) * weighted_feats
     elif args.centroid_update_rule == 'pred_hard':
-        pls = torch.max(output)[1].cpu().numpy()
+        pls = torch.max(output, dim=1)[1].detach().cpu().numpy()
         pls = labelset[pls]
         for idx, pl in enumerate(pls):
             centroid[pl] = args.centroid_ema * centroid[pl] + (1 - args.centroid_ema) * feature[idx]
@@ -674,7 +674,7 @@ if __name__ == "__main__":
     parser.add_argument('--dropout_4', type=float, default=0)
 
     parser.add_argument('--recompute_centroid', type=str2bool, default=False)
-    parser.add_argument('--centroid_update_rule', type=str, choices=['pred_hard', 'pred_soft', 'dist_hard', 'dist_soft'],
+    parser.add_argument('--centroid_update_rule', type=str, choices=['pred_hard', 'pred_soft', 'dist_hard', 'dist_soft', 'none'],
                         default='dist_soft')
     parser.add_argument('--centroid_ema', type=float, default=0.99)
 
