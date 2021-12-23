@@ -573,7 +573,7 @@ def update_centroid(args, feature, centroid, output, labelset):
 
     if args.centroid_update_rule == 'pred_soft':
         pls = output.detach().cpu().numpy()
-        weighted_feats = pls.transpose().dot(feature) / (1e-8 + pls.sum(axis=0)[:, None])
+        weighted_feats = pls.transpose().dot(feature)
         centroid = args.centroid_ema * centroid + (1 - args.centroid_ema) * weighted_feats
     elif args.centroid_update_rule == 'pred_hard':
         pls = torch.max(output, dim=1)[1].detach().cpu().numpy()
@@ -583,7 +583,7 @@ def update_centroid(args, feature, centroid, output, labelset):
     elif args.centroid_update_rule == 'dist_soft':
         dd = cdist(feature, centroid, args.distance)
         pls = softmax(dd, axis=1)
-        weighted_feats = pls.transpose().dot(feature) / (1e-8 + pls.sum(axis=0)[:, None])
+        weighted_feats = pls.transpose().dot(feature)
         centroid = args.centroid_ema * centroid + (1 - args.centroid_ema) * weighted_feats
     elif args.centroid_update_rule == 'dist_hard':
         dd = cdist(feature, centroid, args.distance)
