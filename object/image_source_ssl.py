@@ -197,11 +197,11 @@ def cal_acc(loader, netF, netH, netB, netC, args, flag=False):
             outputs = netC(netB(netF(inputs)), labels_forward)
             if start_test:
                 all_output = outputs.float().cpu()
-                all_label = labels.float()
+                all_label = labels.float().cpu()
                 start_test = False
             else:
                 all_output = torch.cat((all_output, outputs.float().cpu()), 0)
-                all_label = torch.cat((all_label, labels.float()), 0)
+                all_label = torch.cat((all_label, labels.float().cpu()), 0)
 
     all_output = nn.Softmax(dim=1)(all_output)
     _, predict = torch.max(all_output, 1)
