@@ -261,6 +261,8 @@ def train_target(args):
     interval_iter = max_iter // args.interval
     iter_num = 0
 
+    mem_label = None
+
     while iter_num < max_iter:
         try:
             inputs_test, _, tar_idx = iter_test.next()
@@ -279,7 +281,7 @@ def train_target(args):
             netF.eval()
             netH.eval()
             netB.eval()
-            mem_label, mem_conf = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args)
+            mem_label, mem_conf = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args, mem_label)
             mem_label = torch.from_numpy(mem_label).cuda()
 
             netF.train()
@@ -290,6 +292,8 @@ def train_target(args):
         inputs_test2 = None
         inputs_test3 = None
 
+        pred = mem_label[tar_idx]
+
         if type(inputs_test) is list:
             inputs_test1 = inputs_test[0].cuda()
             inputs_test2 = inputs_test[1].cuda()
@@ -298,10 +302,15 @@ def train_target(args):
         else:
             inputs_test1 = inputs_test.cuda()
 
+        if args.layer in ['add_margin', 'arc_margin', 'sphere'] and args.use_margin_forward:
+            labels_forward = pred
+        else:
+            labels_forward = None
+
         if inputs_test is not None:
             f1 = netF(inputs_test1)
             b1 = netB(f1)
-            outputs_test = netC(b1)
+            outputs_test = netC(b1, labels_forward)
         if use_second_pass:
             f2 = netF(inputs_test2)
             b2 = netB(f2)
@@ -310,12 +319,12 @@ def train_target(args):
                 with torch.no_grad():
                     f3 = netF(inputs_test3)
                     b3 = netB(f3)
-                    c3 = netC(b3)
+                    c3 = netC(b3, labels_forward)
                     conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
             else:
                 f3 = netF(inputs_test3)
                 b3 = netB(f3)
-                c3 = netC(b3)
+                c3 = netC(b3, labels_forward)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
         iter_num += 1
@@ -343,7 +352,6 @@ def train_target(args):
             #    conf = conf.cpu().numpy()
             conf_cls = mem_conf[tar_idx]
 
-            pred = mem_label[tar_idx]
             if args.cls_smooth > 0:
                 classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
                     outputs_test[conf_cls >= args.conf_threshold],
@@ -462,7 +470,7 @@ def print_args(args):
     return s
 
 
-def obtain_label(loader, netF, netH, netB, netC, args):
+def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
     start_test = True
     with torch.no_grad():
         iter_test = iter(loader)
@@ -471,9 +479,16 @@ def obtain_label(loader, netF, netH, netB, netC, args):
 
             inputs = data[0]
             labels = data[1]
+            tar_idx = data[2]
             inputs = inputs.cuda()
             feas = netB(netF(inputs))
-            outputs = netC(feas)
+
+            if (mem_label is not None) and (args.layer in ['add_margin', 'arc_margin', 'sphere']) and args.use_margin_pl:
+                labels_forward = mem_label[tar_idx]
+            else:
+                labels_forward = None
+
+            outputs = netC(feas, labels_forward)
             if start_test:
                 all_fea = feas.float().cpu()
                 all_output = outputs.float().cpu()
@@ -630,6 +645,9 @@ if __name__ == "__main__":
     parser.add_argument('--metric_s', type=float, default=30.0)
     parser.add_argument('--metric_m', type=float, default=0.5)
     parser.add_argument('--easy_margin', type=str2bool, default=False)
+
+    parser.add_argument('--use_margin_forward', type=str2bool, default=False)
+    parser.add_argument('--use_margin_pl', type=str2bool, default=False)
 
     args = parser.parse_args()
 
