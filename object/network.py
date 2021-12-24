@@ -9,9 +9,12 @@ from torch.autograd import Variable
 import math
 import torch.nn.utils.weight_norm as weightNorm
 from collections import OrderedDict
+from metric import AddMarginProduct, ArcMarginProduct, SphereProduct
+
 
 def calc_coeff(iter_num, high=1.0, low=0.0, alpha=10.0, max_iter=10000.0):
-    return np.float(2.0 * (high - low) / (1.0 + np.exp(-alpha*iter_num / max_iter)) - (high - low) + low)
+    return np.float(2.0 * (high - low) / (1.0 + np.exp(-alpha * iter_num / max_iter)) - (high - low) + low)
+
 
 def init_weights(m):
     classname = m.__class__.__name__
@@ -28,26 +31,33 @@ def init_weights(m):
         except:
             pass
 
-vgg_dict = {"vgg11":models.vgg11, "vgg13":models.vgg13, "vgg16":models.vgg16, "vgg19":models.vgg19, 
-"vgg11bn":models.vgg11_bn, "vgg13bn":models.vgg13_bn, "vgg16bn":models.vgg16_bn, "vgg19bn":models.vgg19_bn} 
+
+vgg_dict = {"vgg11": models.vgg11, "vgg13": models.vgg13, "vgg16": models.vgg16, "vgg19": models.vgg19,
+            "vgg11bn": models.vgg11_bn, "vgg13bn": models.vgg13_bn, "vgg16bn": models.vgg16_bn,
+            "vgg19bn": models.vgg19_bn}
+
+
 class VGGBase(nn.Module):
-  def __init__(self, vgg_name, pretrained=True):
-    super(VGGBase, self).__init__()
-    model_vgg = vgg_dict[vgg_name](pretrained=False)
-    self.features = model_vgg.features
-    self.classifier = nn.Sequential()
-    for i in range(6):
-        self.classifier.add_module("classifier"+str(i), model_vgg.classifier[i])
-    self.in_features = model_vgg.classifier[6].in_features
+    def __init__(self, vgg_name, pretrained=True):
+        super(VGGBase, self).__init__()
+        model_vgg = vgg_dict[vgg_name](pretrained=False)
+        self.features = model_vgg.features
+        self.classifier = nn.Sequential()
+        for i in range(6):
+            self.classifier.add_module("classifier" + str(i), model_vgg.classifier[i])
+        self.in_features = model_vgg.classifier[6].in_features
 
-  def forward(self, x):
-    x = self.features(x)
-    x = x.view(x.size(0), -1)
-    x = self.classifier(x)
-    return x
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
 
-res_dict = {"resnet18":models.resnet18, "resnet34":models.resnet34, "resnet50":models.resnet50, 
-"resnet101":models.resnet101, "resnet152":models.resnet152, "resnext50":models.resnext50_32x4d, "resnext101":models.resnext101_32x8d}
+
+res_dict = {"resnet18": models.resnet18, "resnet34": models.resnet34, "resnet50": models.resnet50,
+            "resnet101": models.resnet101, "resnet152": models.resnet152, "resnext50": models.resnext50_32x4d,
+            "resnext101": models.resnext101_32x8d}
+
 
 class ResBase(nn.Module):
     def __init__(self, res_name, pretrained=True, args=None):
@@ -97,6 +107,7 @@ class ResBase(nn.Module):
         x = x.view(x.size(0), -1)
         return x
 
+
 class feat_bootleneck(nn.Module):
     def __init__(self, feature_dim, bottleneck_dim=256, type="ori", norm_btn=False):
         super(feat_bootleneck, self).__init__()
@@ -123,8 +134,9 @@ class feat_bootleneck(nn.Module):
             x = F.normalize(x, dim=-1)
         return x
 
+
 class feat_classifier(nn.Module):
-    def __init__(self, class_num, bottleneck_dim=256, type="linear", bias=True, temp=0.1):
+    def __init__(self, class_num, bottleneck_dim=256, type="linear", bias=True, temp=0.1, args=None):
         super(feat_classifier, self).__init__()
         self.type = type
         if type == 'wn':
@@ -134,20 +146,38 @@ class feat_classifier(nn.Module):
             self.fc = nn.Linear(bottleneck_dim, class_num, bias=False)
             self.fc.apply(init_weights)
             self.temp = temp
+        elif type == 'add_margin':
+            self.fc = AddMarginProduct(bottleneck_dim, class_num, args.metric_s, args.metric_m)
+        elif type == 'arc_margin':
+            self.fc = ArcMarginProduct(bottleneck_dim, class_num, args.metric_s, args.metric_m, args.easy_margin)
+        elif type == 'sphere':
+            self.fc = SphereProduct(bottleneck_dim, class_num, args.metric_m)
         else:
             self.fc = nn.Linear(bottleneck_dim, class_num, bias=bias)
             self.fc.apply(init_weights)
 
-    def forward(self, x):
+    def forward(self, x, label=None):
         if self.type == 'angular':
             x = F.normalize(x, dim=1)
             x = self.fc(x) / self.temp
             x /= torch.linalg.norm(self.fc.weight, ord=2, dim=1)
+        elif self.type in ['add_margin', 'arc_margin', 'sphere']:
+            x = self.fc(x, label)
         else:
             x = self.fc(x)
         return x
-    
-    
+
+
+class feat_transformer(nn.Module):
+    def __init__(self, bottleneck_dim=256, bias=True):
+        super(feat_transformer, self).__init__()
+
+        self.fc = nn.Linear(bottleneck_dim, bottleneck_dim, bias=bias)
+
+    def forward(self, x):
+        return self.fc(x)
+
+
 class ssl_head(nn.Module):
     def __init__(self, ssl_task, feature_dim, embedding_dim=128):
         super(ssl_head, self).__init__()
@@ -157,16 +187,15 @@ class ssl_head(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Linear(feature_dim, embedding_dim)
             )
-        
-        
+
     def forward(self, x, norm_feat=False):
         if norm_feat:
             x = F.normalize(x, dim=1)
-        
+
         x = self.head(x)
-        
+
         x = F.normalize(x, dim=1)
-        
+
         return x
 
 
@@ -183,6 +212,7 @@ class feat_classifier_two(nn.Module):
         x = self.fc0(x)
         x = self.fc1(x)
         return x
+
 
 class Res50(nn.Module):
     def __init__(self, pretrained=True):
@@ -213,24 +243,24 @@ class Res50(nn.Module):
         x = x.view(x.size(0), -1)
         y = self.fc(x)
         return x, y
-    
-    
+
+
 class BasicBlockCifar(nn.Module):
     def __init__(self, inplanes, planes, norm_layer, stride=1, downsample=None):
         super(BasicBlockCifar, self).__init__()
         self.downsample = downsample
         self.stride = stride
-        
+
         self.bn1 = norm_layer(inplanes)
         self.relu1 = nn.ReLU(inplace=True)
         self.conv1 = conv3x3(inplanes, planes, stride)
-        
+
         self.bn2 = norm_layer(planes)
         self.relu2 = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
 
     def forward(self, x):
-        residual = x 
+        residual = x
         residual = self.bn1(residual)
         residual = self.relu1(residual)
         residual = self.conv1(residual)
@@ -243,6 +273,7 @@ class BasicBlockCifar(nn.Module):
             x = self.downsample(x)
         return x + residual
 
+
 class Downsample(nn.Module):
     def __init__(self, nIn, nOut, stride):
         super(Downsample, self).__init__()
@@ -252,11 +283,12 @@ class Downsample(nn.Module):
 
     def forward(self, x):
         x = self.avg(x)
-        return torch.cat([x] + [x.mul(0)] * (self.expand_ratio - 1), 1)    
-    
+        return torch.cat([x] + [x.mul(0)] * (self.expand_ratio - 1), 1)
+
+
 class ResCifarBase(nn.Module):
     def __init__(self, depth, width=1, classes=10, channels=3, norm_layer=nn.BatchNorm2d):
-        assert (depth - 2) % 6 == 0         # depth is 6N+2
+        assert (depth - 2) % 6 == 0  # depth is 6N+2
         self.N = (depth - 2) // 6
         super(ResCifarBase, self).__init__()
 
@@ -276,7 +308,7 @@ class ResCifarBase(nn.Module):
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
-                
+
     def _make_layer(self, norm_layer, planes, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes:

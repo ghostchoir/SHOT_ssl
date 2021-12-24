@@ -195,11 +195,11 @@ def train_target(args):
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
                                        bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=args.bottleneck,
-                                       bias=args.classifier_bias, temp=args.angular_temp)
+                                       bias=args.classifier_bias, temp=args.angular_temp, args=args)
     else:
         netB = nn.Identity()
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=netF.in_features,
-                                       bias=args.classifier_bias, temp=args.angular_temp)
+                                       bias=args.classifier_bias, temp=args.angular_temp, args=args)
 
     modelpath = args.output_dir_src + '/source_F.pt'
     netF.load_state_dict(torch.load(modelpath), strict=False)
@@ -623,7 +623,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--bottleneck', type=int, default=256)
     parser.add_argument('--epsilon', type=float, default=1e-5)
-    parser.add_argument('--layer', type=str, default="wn", choices=["linear", "wn", "angular"])
+    parser.add_argument('--layer', type=str, default="wn",
+                        choices=["linear", "wn", "angular", 'add_margin', 'arc_margin', 'sphere'])
     parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--distance', type=str, default='cosine', choices=["euclidean", "cosine"])
@@ -680,6 +681,10 @@ if __name__ == "__main__":
     parser.add_argument('--dropout_4', type=float, default=0)
 
     parser.add_argument('--centroid_threshold', type=float, default=0.0)
+
+    parser.add_argument('--metric_s', type=float, default=30.0)
+    parser.add_argument('--metric_m', type=float, default=0.5)
+    parser.add_argument('--easy_margin', type=str2bool, default=False)
 
     args = parser.parse_args()
 

@@ -189,7 +189,12 @@ def cal_acc(loader, netF, netH, netB, netC, args, flag=False):
             inputs = data[0]
             labels = data[-1]
             inputs = inputs.cuda()
-            outputs = netC(netB(netF(inputs)))
+            labels = labels.cuda()
+            if args.layer in ['add_margin', 'arc_margin', 'sphere']:
+                labels_forward = labels
+            else:
+                labels_forward = None
+            outputs = netC(netB(netF(inputs)), labels_forward)
             if start_test:
                 all_output = outputs.float().cpu()
                 all_label = labels.float()
@@ -285,14 +290,16 @@ def train_source(args):
                                        class_num=args.class_num,
                                        bottleneck_dim=args.bottleneck,
                                        bias=args.classifier_bias,
-                                       temp=args.angular_temp)
+                                       temp=args.angular_temp,
+                                       args=args)
     else:
         netB = nn.Identity()
         netC = network.feat_classifier(type=args.layer,
                                        class_num=args.class_num,
                                        bottleneck_dim=netF.in_features,
                                        bias=args.classifier_bias,
-                                       temp=args.angular_temp)
+                                       temp=args.angular_temp,
+                                       args=args)
 
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
@@ -376,6 +383,11 @@ def train_source(args):
         inputs_source3 = None
         labels_source = labels_source.cuda()
 
+        if args.layer in ['add_margin', 'arc_margin', 'shpere']:
+            labels_forward = labels_source
+        else:
+            labels_forward = None
+
         if type(inputs_source) is list:
             inputs_source1 = inputs_source[0].cuda()
             inputs_source2 = inputs_source[1].cuda()
@@ -387,7 +399,7 @@ def train_source(args):
         if inputs_source1 is not None:
             f1 = netF(inputs_source1)
             b1 = netB(f1)
-            outputs_source = netC(b1)
+            outputs_source = netC(b1, labels_forward)
         if use_second_pass:
             f2 = netF(inputs_source2)
             b2 = netB(f2)
@@ -396,12 +408,12 @@ def train_source(args):
                 with torch.no_grad():
                     f3 = netF(inputs_source3)
                     b3 = netB(f3)
-                    c3 = netC(b3)
+                    c3 = netC(b3, labels_forward)
                     conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
             else:
                 f3 = netF(inputs_source3)
                 b3 = netB(f3)
-                c3 = netC(b3)
+                c3 = netC(b3, labels_forward)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
         if args.cr_weight > 0:
@@ -572,11 +584,11 @@ def test_target(args):
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
                                        bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=args.bottleneck,
-                                       bias=args.classifier_bias)
+                                       bias=args.classifier_bias, args=args)
     else:
         netB = nn.Identity()
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=netF.in_features,
-                                       bias=args.classifier_bias)
+                                       bias=args.classifier_bias, args=args)
 
     args.modelpath = args.output_dir_src + '/source_F.pt'
     netF.load_state_dict(torch.load(args.modelpath))
@@ -655,7 +667,8 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2020, help="random seed")
     parser.add_argument('--bottleneck', type=int, default=256)
     parser.add_argument('--epsilon', type=float, default=1e-5)
-    parser.add_argument('--layer', type=str, default="wn", choices=["linear", "wn", "angular"])
+    parser.add_argument('--layer', type=str, default="wn",
+                        choices=["linear", "wn", "angular", 'add_margin', 'arc_margin', 'sphere'])
     parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--smooth', type=float, default=0.1)
@@ -698,6 +711,10 @@ if __name__ == "__main__":
     parser.add_argument('--ce_weighting', type=str2bool, default=False)
 
     parser.add_argument('--use_new_ntxent', type=str2bool, default=True)
+
+    parser.add_argument('--metric_s', type=float, default=30.0)
+    parser.add_argument('--metric_m', type=float, default=0.5)
+    parser.add_argument('--easy_margin', type=str2bool, default=False)
 
     args = parser.parse_args()
 
