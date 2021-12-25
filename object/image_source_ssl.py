@@ -625,10 +625,10 @@ def test_target(args):
                                                                                             acc_unknown)
     else:
         if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
-            acc, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
+            acc, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, args, True)
             log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}%'.format(args.trte, args.name, acc) + '\n' + acc_list
         else:
-            acc, _ = cal_acc(dset_loaders['test'], netF, netH, netB, netC, False)
+            acc, _ = cal_acc(dset_loaders['test'], netF, netH, netB, netC, args, False)
             log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}%'.format(args.trte, args.name, acc)
 
     args.out_file.write(log_str)
