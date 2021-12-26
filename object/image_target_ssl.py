@@ -302,7 +302,7 @@ def train_target(args):
 
         pred = mem_label[tar_idx]
 
-        if iter_num < args.initial_bn_iter:
+        if iter_num < args.initial_btn_iter:
             netF.eval()
             netH.eval()
             netB.train()
@@ -676,7 +676,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_margin_forward', type=str2bool, default=False)
     parser.add_argument('--use_margin_pl', type=str2bool, default=False)
 
-    parser.add_argument('--initial_bn_iter', type=int, default=0)
+    parser.add_argument('--initial_btn_iter', type=int, default=0)
     parser.add_argument('--reset_running_stats', type=str2bool, default=False)
     parser.add_argument('--reset_bn_params', type=str2bool, default=False)
 
