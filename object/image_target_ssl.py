@@ -182,6 +182,14 @@ def train_target(args):
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
                                        bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
+
+        if args.reset_running_stats and args.classifier == 'bn':
+            netB.norm.running_mean.fill_(0.)
+            netB.norm.running_var.fill(1.)
+
+        if args.reset_bn_params and args.classifier == 'bn':
+            netB.norm.weight.fill_(1.)
+            netB.norm.bias.fill(0.)
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=args.bottleneck,
                                        bias=args.classifier_bias, temp=args.angular_temp, args=args)
     else:
@@ -293,6 +301,25 @@ def train_target(args):
         inputs_test3 = None
 
         pred = mem_label[tar_idx]
+
+        if iter_num < args.initial_bn_iter:
+            netF.eval()
+            netH.eval()
+            netB.train()
+
+            for p in netF.parameters():
+                p.requires_grad = False
+            for p in netH.parameters():
+                p.requires_grad = False
+        else:
+            netF.train()
+            netH.train()
+            netB.train()
+
+            for p in netF.parameters():
+                p.requires_grad = True
+            for p in netH.parameters():
+                p.requires_grad = True
 
         if type(inputs_test) is list:
             inputs_test1 = inputs_test[0].cuda()
@@ -648,6 +675,10 @@ if __name__ == "__main__":
 
     parser.add_argument('--use_margin_forward', type=str2bool, default=False)
     parser.add_argument('--use_margin_pl', type=str2bool, default=False)
+
+    parser.add_argument('--initial_bn_iter', type=int, default=0)
+    parser.add_argument('--reset_running_stats', type=str2bool, default=False)
+    parser.add_argument('--reset_bn_params', type=str2bool, default=False)
 
     args = parser.parse_args()
 
