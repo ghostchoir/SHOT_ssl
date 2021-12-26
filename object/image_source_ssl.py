@@ -14,7 +14,7 @@ from data_list import ImageList
 from data import *
 import random, pdb, math, copy
 from tqdm import tqdm
-from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss, LabelSmoothedSCLLoss
+from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss, LabelSmoothedSCLLoss, Entropy
 from scipy.spatial.distance import cdist
 from sklearn.metrics import confusion_matrix
 from sklearn.cluster import KMeans
@@ -511,7 +511,7 @@ def train_source(args):
 
         if args.im_weight > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_source)
-            entropy_loss = torch.mean(loss.Entropy(softmax_out))
+            entropy_loss = torch.mean(Entropy(softmax_out))
             if args.gent:
                 msoftmax = softmax_out.mean(dim=0)
                 gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
