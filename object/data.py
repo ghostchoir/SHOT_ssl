@@ -369,6 +369,7 @@ def get_image_transform(mode, args, resize_size=256, crop_size=224):
             ]
         trfs += [
             transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
         ]
 
     if args.norm_img:
