@@ -188,8 +188,8 @@ def train_target(args):
             netB.norm.running_var.fill_(1.)
 
         if args.reset_bn_params and args.classifier == 'bn':
-            netB.norm.weight.fill_(1.)
-            netB.norm.bias.fill_(0.)
+            netB.norm.weight.data.fill_(1.)
+            netB.norm.bias.data.fill_(0.)
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=args.bottleneck,
                                        bias=args.classifier_bias, temp=args.angular_temp, args=args)
     else:
