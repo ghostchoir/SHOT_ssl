@@ -700,9 +700,11 @@ if __name__ == "__main__":
     parser.add_argument('--norm_feat', action='store_true')
     parser.add_argument('--norm_btn', action='store_true')
     parser.add_argument('--embedding_dim', type=int, default=128)
-    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
-    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
-    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr'])
+    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug'])
+    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug'])
+    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug'])
+    parser.add_argument('--ra_n', type=int, default=1)
+    parser.add_argument('--ra_m', type=int, default=10)
     parser.add_argument('--sg3', type=str2bool, default=True)
     parser.add_argument('--cls3', type=str2bool, default=False)
     parser.add_argument('--aug_strength', type=float, default=1.0)
@@ -728,6 +730,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--im_weight', type=float, default=0)
     parser.add_argument('--gent', type=str2bool, default=True)
+
+    parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
 
     args = parser.parse_args()
 

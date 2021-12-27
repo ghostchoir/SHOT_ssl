@@ -650,9 +650,11 @@ if __name__ == "__main__":
     parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls', 'uniform'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
     parser.add_argument('--pl_temperature', type=float, default=1.0)
-    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
-    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
-    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr'])
+    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug'])
+    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug'])
+    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug'])
+    parser.add_argument('--ra_n', type=int, default=1)
+    parser.add_argument('--ra_m', type=int, default=10)
     parser.add_argument('--sg3', type=str2bool, default=True)
     parser.add_argument('--cls3', type=str2bool, default=False)
     parser.add_argument('--aug_strength', type=float, default=1.0)
@@ -679,6 +681,8 @@ if __name__ == "__main__":
     parser.add_argument('--initial_btn_iter', type=int, default=0)
     parser.add_argument('--reset_running_stats', type=str2bool, default=False)
     parser.add_argument('--reset_bn_params', type=str2bool, default=False)
+
+    parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
 
     args = parser.parse_args()
 

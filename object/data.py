@@ -2,6 +2,8 @@ from torchvision import transforms, datasets
 import numpy as np
 import cv2
 
+from RandAugment import RandAugment
+
 cv2.setNumThreads(0)
 from data_list import CIFAR10_idx, CIFAR100_idx
 
@@ -316,9 +318,17 @@ def image_test(args, resize_size=256, crop_size=224, alexnet=False):
 
 def get_image_transform(mode, args, resize_size=256, crop_size=224):
     if mode == 'weak':
-        trfs = [
-            transforms.Resize((resize_size, resize_size)),
-            transforms.RandomCrop(crop_size),
+        if args.use_rrc_on_wa:
+            if args.custom_scale:
+                trfs = [transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0))]
+            else:
+                trfs = [transforms.RandomResizedCrop(size=crop_size)]
+        else:
+            trfs = [
+                transforms.Resize((resize_size, resize_size)),
+                transforms.RandomCrop(crop_size),
+            ]
+        trfs += [
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
         ]
@@ -345,6 +355,21 @@ def get_image_transform(mode, args, resize_size=256, crop_size=224):
         if args.gaussblur:
             trfs.append(GaussianBlur(kernel_size=int(0.1 * crop_size)))
         trfs.append(transforms.ToTensor())
+    elif mode == 'randaug':
+        trfs = [RandAugment(args.ra_n, args.ra_m)]
+        if args.use_rrc:
+            if args.custom_scale:
+                trfs += [transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0))]
+            else:
+                trfs += [transforms.RandomResizedCrop(size=crop_size)]
+        else:
+            trfs += [
+                transforms.Resize((resize_size, resize_size)),
+                transforms.RandomCrop(crop_size),
+            ]
+        trfs += [
+            transforms.RandomHorizontalFlip(),
+        ]
 
     if args.norm_img:
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
