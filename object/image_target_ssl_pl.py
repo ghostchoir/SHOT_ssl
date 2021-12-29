@@ -238,13 +238,14 @@ def train_target(args):
 
     if args.calibrate_running_stats and args.classifier == 'bn':
         mean, var = obtain_bn_stats(dset_loaders['pl'], netF, netB, args)
-        mean, var = mean.cuda(), var.cuda()
         if args.dataparallel:
-            netB.module.norm.running_mean = mean
-            netB.module.norm.running_var = var
+            device = netB.module.norm.running_mean.get_device()
+            netB.module.norm.running_mean = mean.to(device)
+            netB.module.norm.running_var = var.to(device)
         else:
-            netB.norm.running_mean = mean
-            netB.norm.running_var = var
+            device = netB.norm.running_mean.get_device()
+            netB.norm.running_mean = mean.to(device)
+            netB.norm.running_var = var.to(device)
 
 
     param_group = []
