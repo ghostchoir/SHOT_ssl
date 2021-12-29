@@ -194,6 +194,14 @@ def train_target(args):
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
                                        bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
+
+        if args.reset_running_stats and args.classifier == 'bn':
+            netB.norm.running_mean.fill_(0.)
+            netB.norm.running_var.fill_(1.)
+
+        if args.reset_bn_params and args.classifier == 'bn':
+            netB.norm.weight.data.fill_(1.)
+            netB.norm.bias.data.fill_(0.)
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=args.bottleneck,
                                        bias=args.classifier_bias, temp=args.angular_temp, args=args)
     else:
@@ -226,6 +234,17 @@ def train_target(args):
         netH.cuda()
         netB.cuda()
         netC.cuda()
+
+
+    if args.calibrate_running_stats and args.classifier == 'bn':
+        mean, var = obtain_bn_stats(dset_loaders['pl'], netF, netB, args)
+        if args.dataparallel:
+            netB.module.norm.running_mean = mean
+            netB.module.norm.running_var = var
+        else:
+            netB.norm.running_mean = mean
+            netB.norm.running_var = var
+
 
     param_group = []
     for k, v in netF.named_parameters():
@@ -311,6 +330,27 @@ def train_target(args):
         inputs_test2 = None
         inputs_test3 = None
 
+        pred = mem_label[tar_idx]
+
+        if iter_num < args.initial_btn_iter:
+            netF.eval()
+            netH.eval()
+            netB.train()
+
+            for p in netF.parameters():
+                p.requires_grad = False
+            for p in netH.parameters():
+                p.requires_grad = False
+        else:
+            netF.train()
+            netH.train()
+            netB.train()
+
+            for p in netF.parameters():
+                p.requires_grad = True
+            for p in netH.parameters():
+                p.requires_grad = True
+
         if type(inputs_test) is list:
             inputs_test1 = inputs_test[0].cuda()
             inputs_test2 = inputs_test[1].cuda()
@@ -319,10 +359,15 @@ def train_target(args):
         else:
             inputs_test1 = inputs_test.cuda()
 
+        if args.layer in ['add_margin', 'arc_margin', 'sphere'] and args.use_margin_forward:
+            labels_forward = pred
+        else:
+            labels_forward = None
+
         if inputs_test is not None:
             f1 = netF(inputs_test1)
             b1 = netB(f1)
-            outputs_test = netC(b1)
+            outputs_test = netC(b1, labels_forward)
             conf_live = torch.max(F.softmax(outputs_test, dim=1), dim=1)[0]
         if use_second_pass:
             f2 = netF(inputs_test2)
@@ -332,12 +377,12 @@ def train_target(args):
                 with torch.no_grad():
                     f3 = netF(inputs_test3)
                     b3 = netB(f3)
-                    c3 = netC(b3)
+                    c3 = netC(b3, labels_forward)
                     conf_cr = torch.max(F.softmax(c3, dim=1), dim=1)[0]
             else:
                 f3 = netF(inputs_test3)
                 b3 = netB(f3)
-                c3 = netC(b3)
+                c3 = netC(b3, labels_forward)
                 conf_cr = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
         iter_num += 1
@@ -370,7 +415,7 @@ def train_target(args):
             #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
             #    conf = conf.cpu().numpy()
 
-            pred = mem_label[tar_idx]
+            #pred = mem_label[tar_idx]
             if args.cls_smooth > 0:
                 classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
                     outputs_test[cls_thres_idx],
@@ -500,6 +545,27 @@ def print_args(args):
     for arg, content in args.__dict__.items():
         s += "{}:{}\n".format(arg, content)
     return s
+
+
+def obtain_bn_stats(loader, netF, netB, args):
+    start_test = True
+    with torch.no_grad():
+        iter_test = iter(loader)
+        for _ in range(len(loader)):
+            data = iter_test.next()
+
+            inputs = data[0].cuda()
+            feas = netB(netF(inputs))
+            if start_test:
+                all_fea = feas.float().cpu()
+                start_test = False
+            else:
+                all_fea = torch.cat((all_fea, feas.float().cpu()), 0)
+
+        mean = torch.mean(all_fea, dim=0)
+        var = torch.var(all_fea, dim=0, unbiased=args.unbiased_var)
+
+    return mean, var
 
 
 def obtain_label(loader, netF, netH, netB, netC, args):
@@ -689,6 +755,18 @@ if __name__ == "__main__":
     parser.add_argument('--easy_margin', type=str2bool, default=False)
 
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
+
+    parser.add_argument('--metric_s', type=float, default=30.0)
+    parser.add_argument('--metric_m', type=float, default=0.5)
+    parser.add_argument('--easy_margin', type=str2bool, default=False)
+
+    parser.add_argument('--use_margin_forward', type=str2bool, default=False)
+    parser.add_argument('--use_margin_pl', type=str2bool, default=False)
+
+    parser.add_argument('--initial_btn_iter', type=int, default=0)
+    parser.add_argument('--reset_running_stats', type=str2bool, default=False)
+    parser.add_argument('--reset_bn_params', type=str2bool, default=False)
+    parser.add_argument('--calibrate_running_stats', type=str2bool, default=False)
 
     args = parser.parse_args()
 

@@ -223,6 +223,17 @@ def train_target(args):
         netB.cuda()
         netC.cuda()
 
+
+    if args.calibrate_running_stats and args.classifier == 'bn':
+        mean, var = obtain_bn_stats(dset_loaders['pl'], netF, netB, args)
+        if args.dataparallel:
+            netB.module.norm.running_mean = mean
+            netB.module.norm.running_var = var
+        else:
+            netB.norm.running_mean = mean
+            netB.norm.running_var = var
+
+
     param_group = []
     for k, v in netF.named_parameters():
         if args.lr_decay1 > 0:
@@ -497,6 +508,27 @@ def print_args(args):
     return s
 
 
+def obtain_bn_stats(loader, netF, netB, args):
+    start_test = True
+    with torch.no_grad():
+        iter_test = iter(loader)
+        for _ in range(len(loader)):
+            data = iter_test.next()
+
+            inputs = data[0].cuda()
+            feas = netB(netF(inputs))
+            if start_test:
+                all_fea = feas.float().cpu()
+                start_test = False
+            else:
+                all_fea = torch.cat((all_fea, feas.float().cpu()), 0)
+
+        mean = torch.mean(all_fea, dim=0)
+        var = torch.var(all_fea, dim=0, unbiased=args.unbiased_var)
+
+    return mean, var
+
+
 def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
     start_test = True
     with torch.no_grad():
@@ -681,6 +713,7 @@ if __name__ == "__main__":
     parser.add_argument('--initial_btn_iter', type=int, default=0)
     parser.add_argument('--reset_running_stats', type=str2bool, default=False)
     parser.add_argument('--reset_bn_params', type=str2bool, default=False)
+    parser.add_argument('--calibrate_running_stats', type=str2bool, default=False)
 
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
 

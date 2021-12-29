@@ -183,12 +183,19 @@ def train_target(args):
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
                                        bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
+        if args.reset_running_stats and args.classifier == 'bn':
+            netB.norm.running_mean.fill_(0.)
+            netB.norm.running_var.fill_(1.)
+
+        if args.reset_bn_params and args.classifier == 'bn':
+            netB.norm.weight.data.fill_(1.)
+            netB.norm.bias.data.fill_(0.)
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=args.bottleneck,
-                                       bias=args.classifier_bias, temp=args.angular_temp)
+                                       bias=args.classifier_bias, temp=args.angular_temp, args=args)
     else:
         netB = nn.Identity()
         netC = network.feat_classifier(type=args.layer, class_num=args.class_num, bottleneck_dim=netF.in_features,
-                                       bias=args.classifier_bias, temp=args.angular_temp)
+                                       bias=args.classifier_bias, temp=args.angular_temp, args=args)
 
     modelpath = args.output_dir_src + '/source_F.pt'
     netF.load_state_dict(torch.load(modelpath), strict=False)
@@ -296,6 +303,8 @@ def train_target(args):
         inputs_test2 = None
         inputs_test3 = None
 
+        pred = mem_label[tar_idx]
+
         if type(inputs_test) is list:
             inputs_test1 = inputs_test[0].cuda()
             inputs_test2 = inputs_test[1].cuda()
@@ -304,10 +313,15 @@ def train_target(args):
         else:
             inputs_test1 = inputs_test.cuda()
 
+        if args.layer in ['add_margin', 'arc_margin', 'sphere'] and args.use_margin_forward:
+            labels_forward = pred
+        else:
+            labels_forward = None
+
         if inputs_test is not None:
             f1 = netF(inputs_test1)
             b1 = netB(f1)
-            outputs_test = netC(b1)
+            outputs_test = netC(b1, labels_forward)
         if use_second_pass:
             f2 = netF(inputs_test2)
             b2 = netB(f2)
@@ -316,12 +330,12 @@ def train_target(args):
                 with torch.no_grad():
                     f3 = netF(inputs_test3)
                     b3 = netB(f3)
-                    c3 = netC(b3)
+                    c3 = netC(b3, labels_forward)
                     conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
             else:
                 f3 = netF(inputs_test3)
                 b3 = netB(f3)
-                c3 = netC(b3)
+                c3 = netC(b3, labels_forward)
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
         iter_num += 1
@@ -630,7 +644,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--bottleneck', type=int, default=256)
     parser.add_argument('--epsilon', type=float, default=1e-5)
-    parser.add_argument('--layer', type=str, default="wn", choices=["linear", "wn", "angular"])
+    parser.add_argument('--layer', type=str, default="wn",
+                        choices=["linear", "wn", "angular", 'add_margin', 'arc_margin', 'sphere'])
     parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--distance', type=str, default='cosine', choices=["euclidean", "cosine"])
@@ -659,9 +674,9 @@ if __name__ == "__main__":
     parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls', 'uniform'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
     parser.add_argument('--pl_temperature', type=float, default=1.0)
-    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
-    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr'])
-    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr'])
+    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug'])
+    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug'])
+    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug'])
     parser.add_argument('--sg3', type=str2bool, default=True)
     parser.add_argument('--cls3', type=str2bool, default=False)
     parser.add_argument('--aug_strength', type=float, default=1.0)
@@ -683,6 +698,19 @@ if __name__ == "__main__":
                         default='dist_soft')
     parser.add_argument('--centroid_ema', type=float, default=0.99)
     parser.add_argument('--initial_centroid', type=str, choices=['raw', 'hard'], default='raw')
+
+    parser.add_argument('--metric_s', type=float, default=30.0)
+    parser.add_argument('--metric_m', type=float, default=0.5)
+    parser.add_argument('--easy_margin', type=str2bool, default=False)
+
+    parser.add_argument('--use_margin_forward', type=str2bool, default=False)
+    parser.add_argument('--use_margin_pl', type=str2bool, default=False)
+
+    parser.add_argument('--initial_btn_iter', type=int, default=0)
+    parser.add_argument('--reset_running_stats', type=str2bool, default=False)
+    parser.add_argument('--reset_bn_params', type=str2bool, default=False)
+
+    parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
 
     args = parser.parse_args()
 
