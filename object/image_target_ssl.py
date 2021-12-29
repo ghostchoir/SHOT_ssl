@@ -714,6 +714,7 @@ if __name__ == "__main__":
     parser.add_argument('--reset_running_stats', type=str2bool, default=False)
     parser.add_argument('--reset_bn_params', type=str2bool, default=False)
     parser.add_argument('--calibrate_running_stats', type=str2bool, default=False)
+    parser.add_argument('--unbiased_var', type=str2bool, default=True)
 
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
 
