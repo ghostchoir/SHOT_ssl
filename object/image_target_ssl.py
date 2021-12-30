@@ -540,7 +540,7 @@ def obtain_bn_stats(loader, netF, netB, args):
     return mean, var
 
 
-def obtain_label(loader, netF, netH, netB, netC, args):
+def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
     start_test = True
     with torch.no_grad():
         iter_test = iter(loader)
@@ -549,9 +549,17 @@ def obtain_label(loader, netF, netH, netB, netC, args):
 
             inputs = data[0]
             labels = data[1]
+            tar_idx = data[2]
             inputs = inputs.cuda()
             feas = netB(netF(inputs))
-            outputs = netC(feas)
+
+            if (mem_label is not None) and (args.layer in ['add_margin', 'arc_margin', 'sphere']) and args.use_margin_pl:
+                labels_forward = mem_label[tar_idx]
+            else:
+                labels_forward = None
+
+            outputs = netC(feas, labels_forward)
+
             if start_test:
                 all_fea = feas.float().cpu()
                 all_output = outputs.float().cpu()
