@@ -298,8 +298,7 @@ def train_target(args):
             if inputs_test[0].size(0) == 1:
                 continue
 
-        if iter_num % interval_iter == 0 and (args.cls_par > 0 or args.ssl_task in ['supcon', 'ls_supcon', 'crsc'])\
-                and (not args.upper_bound_run):
+        if iter_num % interval_iter == 0 and (args.cls_par > 0 or args.ssl_task in ['supcon', 'ls_supcon', 'crsc']):
             netF.eval()
             netH.eval()
             netB.eval()
