@@ -286,10 +286,10 @@ def train_target(args):
 
     while iter_num < max_iter:
         try:
-            inputs_test, _, tar_idx = iter_test.next()
+            inputs_test, labels_test, tar_idx = iter_test.next()
         except:
             iter_test = iter(dset_loaders["target"])
-            inputs_test, _, tar_idx = iter_test.next()
+            inputs_test, labels_test, tar_idx = iter_test.next()
 
         try:
             if inputs_test.size(0) == 1:
@@ -313,7 +313,10 @@ def train_target(args):
         inputs_test2 = None
         inputs_test3 = None
 
-        pred = mem_label[tar_idx]
+        if args.upper_bound_run:
+            pred = labels_test.cuda()
+        else:
+            pred = mem_label[tar_idx]
 
         if iter_num < args.initial_btn_iter:
             netF.eval()
@@ -719,6 +722,8 @@ if __name__ == "__main__":
     parser.add_argument('--unbiased_var', type=str2bool, default=True)
 
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
+
+    parser.add_argument('--upper_bound_run', type=str2bool, default=False)
 
     args = parser.parse_args()
 
