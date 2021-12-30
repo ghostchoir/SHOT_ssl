@@ -311,10 +311,11 @@ def train_target(args):
             netB.train()
 
         if iter_num == 0 and args.calibrate_cls_weights:
-            device = netC.fc.weight.device
             if args.dataparallel:
+                device = netC.module.fc.weight.device
                 netC.module.fc.weight = nn.Parameter(torch.from_numpy(centroids)).to(device)
             else:
+                device = netC.fc.weight.device
                 netC.fc.weight = nn.Parameter(torch.from_numpy(centroids)).to(device)
 
         inputs_test1 = None
