@@ -302,10 +302,10 @@ def train_target(args):
 
     while iter_num < max_iter:
         try:
-            inputs_test, _, tar_idx = iter_test.next()
+            inputs_test, labels_test, tar_idx = iter_test.next()
         except:
             iter_test = iter(dset_loaders["target"])
-            inputs_test, _, tar_idx = iter_test.next()
+            inputs_test, labels_test, tar_idx = iter_test.next()
 
         try:
             if inputs_test.size(0) == 1:
@@ -339,6 +339,11 @@ def train_target(args):
         inputs_test1 = None
         inputs_test2 = None
         inputs_test3 = None
+
+        if args.upper_bound_run:
+            pred = labels_test.cuda()
+        else:
+            pred = mem_label[tar_idx]
 
         if type(inputs_test) is list:
             inputs_test1 = inputs_test[0].cuda()
@@ -393,7 +398,7 @@ def train_target(args):
             #    conf = conf.cpu().numpy()
             conf_cls = mem_conf[tar_idx]
 
-            pred = mem_label[tar_idx]
+            #pred = mem_label[tar_idx]
             if args.cls_smooth > 0:
                 classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
                     outputs_test[conf_cls >= args.conf_threshold],
@@ -439,18 +444,19 @@ def train_target(args):
                 if use_third_pass:
                     z3 = netH(b3, args.norm_feat)
 
+            if args.upper_bound_run:
+                pl = labels_test
+            else:
+                pl = mem_label[tar_idx]
             if args.ssl_task == 'simclr':
                 ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
                 z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
-                pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z, pl)
             elif args.ssl_task == 'ls_supcon':
-                pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z1, z2, pl).squeeze()
             elif args.ssl_task == 'crsc':
                 z = torch.cat([z1.unsqueeze(1), z3.unsqueeze(1)], dim=1)
-                pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z, pl)
             elif args.ssl_task == 'crs':
                 ssl_loss = ssl_loss_fn(z1, z3)
@@ -693,6 +699,8 @@ if __name__ == "__main__":
     parser.add_argument('--easy_margin', type=str2bool, default=False)
 
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
+
+    parser.add_argument('--upper_bound_run', type=str2bool, default=False)
 
     args = parser.parse_args()
 
