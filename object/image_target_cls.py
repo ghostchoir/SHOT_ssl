@@ -315,10 +315,12 @@ def train_target(args):
                 continue
 
         if iter_num % switch_training_iter == 0:
+            print(curr_training_mode)
             if curr_training_mode == 'feat':
                 curr_training_mode = 'cls'
             elif curr_training_mode == 'cls':
                 curr_training_mode = 'feat'
+            print(curr_training_mode)
             switch_training_stage(netF, netB, netH, netC, curr_training_mode)
 
         if iter_num % interval_iter == 0 and (args.cls_par > 0 or args.ssl_task in ['supcon', 'ls_supcon', 'crsc']):
