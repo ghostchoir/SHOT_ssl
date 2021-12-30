@@ -313,10 +313,10 @@ def train_target(args):
         if iter_num == 0 and args.calibrate_cls_weights:
             if args.dataparallel:
                 device = netC.module.fc.weight.device
-                netC.module.fc.weight.data = torch.from_numpy(centroids).to(device)
+                netC.module.fc.weight.data = torch.from_numpy(centroids).float().to(device)
             else:
                 device = netC.fc.weight.device
-                netC.fc.weight.data = torch.from_numpy(centroids).to(device)
+                netC.fc.weight.data = torch.from_numpy(centroids).float().to(device)
 
         inputs_test1 = None
         inputs_test2 = None
