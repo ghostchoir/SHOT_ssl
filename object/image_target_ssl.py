@@ -208,6 +208,7 @@ def train_target(args):
         print('Skipped loading btn for version compatibility')
     modelpath = args.output_dir_src + '/source_C.pt'
     netC.load_state_dict(torch.load(modelpath), strict=False)
+    cls_weights = copy.deepcopy(netC.fc.weight.data).numpy()
     netC.eval()
     for k, v in netC.named_parameters():
         v.requires_grad = False
@@ -302,12 +303,16 @@ def train_target(args):
             netF.eval()
             netH.eval()
             netB.eval()
-            mem_label, mem_conf = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args, mem_label)
+            mem_label, mem_conf, centroids, labelset = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args, mem_label)
             mem_label = torch.from_numpy(mem_label).cuda()
 
             netF.train()
             netH.train()
             netB.train()
+
+        if iter_num == 0 and args.calibrate_cls_weights:
+            device = netC.fc.weight.device
+            netC.fc.weight = nn.Parameter(torch.from_numpy(centroids)).to(device)
 
         inputs_test1 = None
         inputs_test2 = None
@@ -535,7 +540,7 @@ def obtain_bn_stats(loader, netF, netB, args):
     return mean, var
 
 
-def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
+def obtain_label(loader, netF, netH, netB, netC, args):
     start_test = True
     with torch.no_grad():
         iter_test = iter(loader)
@@ -544,16 +549,9 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
 
             inputs = data[0]
             labels = data[1]
-            tar_idx = data[2]
             inputs = inputs.cuda()
             feas = netB(netF(inputs))
-
-            if (mem_label is not None) and (args.layer in ['add_margin', 'arc_margin', 'sphere']) and args.use_margin_pl:
-                labels_forward = mem_label[tar_idx]
-            else:
-                labels_forward = None
-
-            outputs = netC(feas, labels_forward)
+            outputs = netC(feas)
             if start_test:
                 all_fea = feas.float().cpu()
                 all_output = outputs.float().cpu()
@@ -590,7 +588,6 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
         if args.distance == 'cosine':
             #all_fea = torch.cat((all_fea, torch.ones(all_fea.size(0), 1)), 1)
             all_fea = (all_fea.t() / torch.norm(all_fea, p=2, dim=1)).t()
-
         all_fea = all_fea.float().cpu().numpy()
         K = all_output.size(1)
         aff = all_output.float().cpu().numpy()
@@ -607,9 +604,9 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
 
         for round in range(args.pl_rounds):
             aff = np.eye(K)[pred_label]
-            initc = aff.transpose().dot(all_fea)
-            initc = initc / (1e-8 + aff.sum(axis=0)[:, None])
-            dd = cdist(all_fea, initc[labelset], args.distance)
+            c = aff.transpose().dot(all_fea)
+            c = c / (1e-8 + aff.sum(axis=0)[:, None])
+            dd = cdist(all_fea, c[labelset], args.distance)
             pred_label = dd.argmin(axis=1)
             pred_label = labelset[pred_label]
 
@@ -620,7 +617,12 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
     args.out_file.flush()
     print(log_str + '\n')
 
-    return pred_label.astype('int'), conf.cpu().numpy()
+    if args.initial_centroid == 'raw':
+        centroids = initc
+    elif args.initial_centroid == 'hard':
+        centroids = c
+
+    return pred_label.astype('int'), conf.cpu().numpy(), centroids, labelset
 
 
 if __name__ == "__main__":
@@ -725,6 +727,9 @@ if __name__ == "__main__":
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
 
     parser.add_argument('--upper_bound_run', type=str2bool, default=False)
+
+    parser.add_argument('--initial_centroid', type=str, choices=['raw', 'hard'], default='raw')
+    parser.add_argument('--calibrate_cls_weights', type=str2bool, default=False)
 
     args = parser.parse_args()
 
