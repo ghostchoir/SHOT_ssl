@@ -588,7 +588,7 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
 
         accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
         if args.distance == 'cosine':
-            all_fea = torch.cat((all_fea, torch.ones(all_fea.size(0), 1)), 1)
+            #all_fea = torch.cat((all_fea, torch.ones(all_fea.size(0), 1)), 1)
             all_fea = (all_fea.t() / torch.norm(all_fea, p=2, dim=1)).t()
 
         all_fea = all_fea.float().cpu().numpy()
