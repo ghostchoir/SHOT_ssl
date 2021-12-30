@@ -298,7 +298,8 @@ def train_target(args):
             if inputs_test[0].size(0) == 1:
                 continue
 
-        if iter_num % interval_iter == 0 and (args.cls_par > 0 or args.ssl_task in ['supcon', 'ls_supcon', 'crsc']):
+        if iter_num % interval_iter == 0 and (args.cls_par > 0 or args.ssl_task in ['supcon', 'ls_supcon', 'crsc'])\
+                and (not args.upper_bound_run):
             netF.eval()
             netH.eval()
             netB.eval()
@@ -440,18 +441,19 @@ def train_target(args):
                 if use_third_pass:
                     z3 = netH(b3, args.norm_feat)
 
+            if args.upper_bound_run:
+                pl = labels_test
+            else:
+                pl = mem_label[tar_idx]
             if args.ssl_task == 'simclr':
                 ssl_loss = ssl_loss_fn(z1, z2)
             elif args.ssl_task == 'supcon':
                 z = torch.cat([z1.unsqueeze(1), z2.unsqueeze(1)], dim=1)
-                pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z, pl)
             elif args.ssl_task == 'ls_supcon':
-                pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z1, z2, pl).squeeze()
             elif args.ssl_task == 'crsc':
                 z = torch.cat([z1.unsqueeze(1), z3.unsqueeze(1)], dim=1)
-                pl = mem_label[tar_idx]
                 ssl_loss = ssl_loss_fn(z, pl)
             elif args.ssl_task == 'crs':
                 ssl_loss = ssl_loss_fn(z1, z3)
