@@ -594,7 +594,8 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
             weights = copy.deepcopy(netC.fc.weight.data).cpu().numpy()
 
         all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
-        conf, _ = torch.max(all_output, 1)
+        conf, predict = torch.max(all_output, 1)
+        accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
         if args.pl_type == 'spherical_kmeans':
             all_fea_norm = F.normalize(all_fea, dim=1)
             kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
