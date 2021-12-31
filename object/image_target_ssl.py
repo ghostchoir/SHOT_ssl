@@ -667,7 +667,10 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
     elif args.initial_centroid == 'hard':
         centroids = c
 
-    return pred_label.astype('int'), conf.cpu().numpy(), centroids, labelset
+    try:
+        return pred_label.astype('int'), conf.cpu().numpy(), centroids, labelset
+    except:
+        return pred_label.astype('int'), conf, centroids, labelset
 
 
 if __name__ == "__main__":
