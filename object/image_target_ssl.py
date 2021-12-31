@@ -253,7 +253,7 @@ def train_target(args):
             v.requires_grad = False
 
     if args.use_focal_loss:
-        cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma)
+        cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma, reduction='mean')
     else:
         if args.cls_smooth == 0:
             cls_loss_fn = nn.CrossEntropyLoss()

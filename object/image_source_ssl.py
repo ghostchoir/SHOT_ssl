@@ -337,7 +337,7 @@ def train_source(args):
     netC.train()
 
     if args.use_focal_loss:
-        cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma)
+        cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma, reduction='mean')
     else:
         if args.ce_weighting:
             w = torch.Tensor(args.ce_weight).cuda()
