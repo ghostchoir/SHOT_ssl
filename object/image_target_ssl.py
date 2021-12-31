@@ -12,7 +12,7 @@ import network, loss
 from torch.utils.data import DataLoader
 from data_list import ImageList, ImageList_idx, CIFAR10_idx
 from data import *
-from loss import NTXentLoss, SupConLoss, CrossEntropyLabelSmooth, LabelSmoothedSCLLoss
+from loss import NTXentLoss, SupConLoss, CrossEntropyLabelSmooth, LabelSmoothedSCLLoss, FocalLoss
 import random, pdb, math, copy
 from tqdm import tqdm
 from scipy.spatial.distance import cdist
@@ -224,7 +224,6 @@ def train_target(args):
         netB.cuda()
         netC.cuda()
 
-
     if args.calibrate_running_stats and args.classifier == 'bn':
         mean, var = obtain_bn_stats(dset_loaders['pl'], netF, netB, args)
         if args.dataparallel:
@@ -235,7 +234,6 @@ def train_target(args):
             device = netB.norm.running_mean.get_device()
             netB.norm.running_mean = mean.to(device)
             netB.norm.running_var = var.to(device)
-
 
     param_group = []
     for k, v in netF.named_parameters():
@@ -253,6 +251,14 @@ def train_target(args):
             param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
         else:
             v.requires_grad = False
+
+    if args.use_focal_loss:
+        cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma)
+    else:
+        if args.smooth == 0:
+            cls_loss_fn = nn.CrossEntropyLoss()
+        else:
+            cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)
 
     if args.ssl_task in ['simclr', 'crs']:
         ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
@@ -303,7 +309,12 @@ def train_target(args):
             netF.eval()
             netH.eval()
             netB.eval()
-            mem_label, mem_conf, centroids, labelset = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args, mem_label)
+            if args.eval_off_once:
+                eval_off = iter_num == 0
+            else:
+                eval_off = True
+            mem_label, mem_conf, centroids, labelset = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args,
+                                                                    mem_label, eval_off)
             mem_label = torch.from_numpy(mem_label).cuda()
 
             netF.train()
@@ -404,23 +415,13 @@ def train_target(args):
             #    conf = conf.cpu().numpy()
             conf_cls = mem_conf[tar_idx]
 
-            if args.cls_smooth > 0:
-                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
-                    outputs_test[conf_cls >= args.conf_threshold],
-                    pred[conf_cls >= args.conf_threshold])
-            else:
-                classifier_loss = nn.CrossEntropyLoss()(outputs_test[conf_cls >= args.conf_threshold],
-                                                        pred[conf_cls >= args.conf_threshold])
+            classifier_loss = cls_loss_fn(outputs_test[conf_cls >= args.conf_threshold],
+                                          pred[conf_cls >= args.conf_threshold])
             if args.cls3:
-                if args.cls_smooth > 0:
-                    classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)(
-                        c3[conf_cls >= args.conf_threshold],
-                        pred[conf_cls >= args.conf_threshold])
-                else:
-                    classifier_loss = nn.CrossEntropyLoss()(c3[conf_cls >= args.conf_threshold],
-                                                            pred[conf_cls >= args.conf_threshold])
+                classifier_loss += cls_loss_fn(c3[conf_cls >= args.conf_threshold],
+                                               pred[conf_cls >= args.conf_threshold])
             classifier_loss *= args.cls_par
-            if iter_num < interval_iter and args.dset == "visda-c":
+            if iter_num < interval_iter and args.dset == "visda-c" and args.skip_cls_first_iter:
                 classifier_loss *= 0
         else:
             classifier_loss = torch.tensor(0.0).cuda()
@@ -544,10 +545,10 @@ def obtain_bn_stats(loader, netF, netB, args):
     return mean, var
 
 
-def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
-    if args.pl_eval_off_f:
+def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False):
+    if args.pl_eval_off_f and eval_off:
         netF.train()
-    if args.pl_eval_off_b:
+    if args.pl_eval_off_b and eval_off:
         netB.train()
     start_test = True
     with torch.no_grad():
@@ -561,7 +562,8 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
             inputs = inputs.cuda()
             feas = netB(netF(inputs))
 
-            if (mem_label is not None) and (args.layer in ['add_margin', 'arc_margin', 'sphere']) and args.use_margin_pl:
+            if (mem_label is not None) and (
+                    args.layer in ['add_margin', 'arc_margin', 'sphere']) and args.use_margin_pl:
                 labels_forward = mem_label[tar_idx]
             else:
                 labels_forward = None
@@ -602,7 +604,7 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
 
         accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
         if args.distance == 'cosine':
-            #all_fea = torch.cat((all_fea, torch.ones(all_fea.size(0), 1)), 1)
+            # all_fea = torch.cat((all_fea, torch.ones(all_fea.size(0), 1)), 1)
             all_fea = (all_fea.t() / torch.norm(all_fea, p=2, dim=1)).t()
         all_fea = all_fea.float().cpu().numpy()
         K = all_output.size(1)
@@ -657,7 +659,8 @@ if __name__ == "__main__":
     parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
     parser.add_argument('--worker', type=int, default=4, help="number of workers")
     parser.add_argument('--dset', type=str, default='office-home',
-                        choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C', 'image-clef'])
+                        choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C',
+                                 'image-clef'])
     parser.add_argument('--level', type=int, default=5)
     parser.add_argument('--folder', type=str, default='/SSD/euntae/data/')
     parser.add_argument('--lr', type=float, default=1e-2, help="learning rate")
@@ -687,7 +690,8 @@ if __name__ == "__main__":
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda'])
     parser.add_argument('--issave', type=bool, default=True)
 
-    parser.add_argument('--ssl_task', type=str, default='crsc', choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc', 'crs'])
+    parser.add_argument('--ssl_task', type=str, default='crsc',
+                        choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc', 'crs'])
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
@@ -749,6 +753,13 @@ if __name__ == "__main__":
 
     parser.add_argument('--pl_eval_off_f', type=str2bool, default=False)
     parser.add_argument('--pl_eval_off_b', type=str2bool, default=False)
+    parser.add_argument('--eval_off_once', type=str2bool, default=True)
+
+    parser.add_argument('--use_focal_loss', type=str2bool, default=False)
+    parser.add_argument('--focal_alpha', type=float, default=0.5)
+    parser.add_argument('--focal_gamma', type=float, default=2.0)
+
+    parser.add_argument('--skip_cls_first_iter', type=str2bool, default=False)
 
     args = parser.parse_args()
 

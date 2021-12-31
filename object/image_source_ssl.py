@@ -14,7 +14,7 @@ from data_list import ImageList
 from data import *
 import random, pdb, math, copy
 from tqdm import tqdm
-from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss, LabelSmoothedSCLLoss, Entropy
+from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss, LabelSmoothedSCLLoss, Entropy, FocalLoss
 from scipy.spatial.distance import cdist
 from sklearn.metrics import confusion_matrix
 from sklearn.cluster import KMeans
@@ -336,6 +336,22 @@ def train_source(args):
     netB.train()
     netC.train()
 
+    if args.use_focal_loss:
+        cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma)
+    else:
+        if args.ce_weighting:
+            w = torch.Tensor(args.ce_weight).cuda()
+            w.requires_grad = False
+            if args.smooth == 0:
+                cls_loss_fn = nn.CrossEntropyLoss(weight=w).cuda()
+            else:
+                cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth, weight=w).cuda()
+        else:
+            if args.smooth == 0:
+                cls_loss_fn = nn.CrossEntropyLoss().cuda()
+            else:
+                cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth).cuda()
+
     if args.ssl_task in ['simclr', 'crs']:
         if args.use_new_ntxent:
             ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
@@ -432,33 +448,9 @@ def train_source(args):
             else:
                 raise NotImplementedError
 
-        if args.ce_weighting:
-            w = torch.Tensor(args.ce_weight).cuda()
-            w.requires_grad = False
-            if args.smooth == 0:
-                classifier_loss = nn.CrossEntropyLoss(weight=w)(outputs_source, labels_source)
-            else:
-                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth,
-                                                          weight=w)(outputs_source, labels_source)
-            if args.cls3:
-                if args.smooth == 0:
-                    classifier_loss += nn.CrossEntropyLoss(weight=w)(c3, labels_source)
-                else:
-                    classifier_loss += CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth,
-                                                               weight=w)(c3, labels_source)
-        else:
-            if args.smooth == 0:
-                classifier_loss = nn.CrossEntropyLoss()(outputs_source, labels_source)
-            else:
-                classifier_loss = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(
-                    outputs_source, labels_source)
-
-            if args.cls3:
-                if args.smooth == 0:
-                    classifier_loss += nn.CrossEntropyLoss()(c3, labels_source)
-                else:
-                    classifier_loss += CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)(c3,
-                                                                                                                labels_source)
+        classifier_loss = cls_loss_fn(outputs_source, labels_source)
+        if args.cls3:
+            classifier_loss += cls_loss_fn(c3, labels_source)
 
         if args.ssl_weight > 0:
             if args.ssl_before_btn:
@@ -732,6 +724,10 @@ if __name__ == "__main__":
     parser.add_argument('--gent', type=str2bool, default=True)
 
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
+
+    parser.add_argument('--use_focal_loss', type=str2bool, default=False)
+    parser.add_argument('--focal_alpha', type=float, default=0.5)
+    parser.add_argument('--focal_gamma', type=float, default=2.0)
 
     args = parser.parse_args()
 
