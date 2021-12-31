@@ -255,10 +255,10 @@ def train_target(args):
     if args.use_focal_loss:
         cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma)
     else:
-        if args.smooth == 0:
+        if args.cls_smooth == 0:
             cls_loss_fn = nn.CrossEntropyLoss()
         else:
-            cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth)
+            cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)
 
     if args.ssl_task in ['simclr', 'crs']:
         ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
