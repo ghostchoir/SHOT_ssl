@@ -545,6 +545,10 @@ def obtain_bn_stats(loader, netF, netB, args):
 
 
 def obtain_label(loader, netF, netH, netB, netC, args, mem_label):
+    if args.pl_eval_off_f:
+        netF.train()
+    if args.pl_eval_off_b:
+        netB.train()
     start_test = True
     with torch.no_grad():
         iter_test = iter(loader)
@@ -742,6 +746,9 @@ if __name__ == "__main__":
 
     parser.add_argument('--initial_centroid', type=str, choices=['raw', 'hard'], default='raw')
     parser.add_argument('--calibrate_cls_weights', type=str2bool, default=False)
+
+    parser.add_argument('--pl_eval_off_f', type=str2bool, default=False)
+    parser.add_argument('--pl_eval_off_b', type=str2bool, default=False)
 
     args = parser.parse_args()
 
