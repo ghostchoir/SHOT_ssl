@@ -17,6 +17,8 @@ import random, pdb, math, copy
 from tqdm import tqdm
 from scipy.spatial.distance import cdist
 from sklearn.metrics import confusion_matrix
+from sklearn.cluster import KMeans
+from scipy.special import softmax
 
 
 def str2bool(v):
@@ -585,6 +587,26 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         conf, predict = torch.max(all_output, 1)
         accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
         pred_label = torch.squeeze(predict).numpy()
+    elif args.pl_type in ['kmeans', 'spherical_kmeans']:
+        try:
+            weights = copy.deepcopy(netC.module.fc.weight.data).cpu().numpy()
+        except:
+            weights = copy.deepcopy(netC.fc.weight.data).cpu().numpy()
+
+        if args.pl_type == 'spherical_kmeans':
+            all_fea_norm = F.normalize(all_fea, dim=1)
+            kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000).fit(all_fea_norm)
+        else:
+            kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000).fit(all_fea)
+
+        centroids = kmeans.cluster_centers_
+
+        cdists = cdist(all_fea, centroids, metric='cosine')
+        pred_label = cdists.argmin(axis=1)
+        conf = softmax((1 - cdists) / args.pl_temperature, axis=1).max(axis=1)
+        cls_count = np.eye(K)[pred_label].sum(axis=0)
+        labelset = np.where(cls_count > args.threshold)
+        labelset = labelset[0]
     else:
         if args.pl_weight_term == 'softmax':
             all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
@@ -684,7 +706,7 @@ if __name__ == "__main__":
     parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--distance', type=str, default='cosine', choices=["euclidean", "cosine"])
-    parser.add_argument('--pl_type', type=str, default="sspl", choices=["naive", "sspl"])
+    parser.add_argument('--pl_type', type=str, default="sspl", choices=["naive", "sspl", "kmeans", "spherical_kmeans"])
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--output_src', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda'])
