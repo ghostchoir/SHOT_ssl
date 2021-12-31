@@ -604,9 +604,9 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
             kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
                 .fit(all_fea, sample_weight=conf if args.weighted_samples else None)
 
-        centroids = kmeans.cluster_centers_
+        initc = kmeans.cluster_centers_
 
-        cdists = cdist(all_fea, centroids, metric='cosine')
+        cdists = cdist(all_fea, initc, metric='cosine')
         pred_label = cdists.argmin(axis=1)
         conf = softmax((1 - cdists) / args.pl_temperature, axis=1).max(axis=1)
         cls_count = np.eye(args.class_num)[pred_label].sum(axis=0)
