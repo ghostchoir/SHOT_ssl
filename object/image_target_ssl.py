@@ -593,18 +593,22 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         except:
             weights = copy.deepcopy(netC.fc.weight.data).cpu().numpy()
 
+        all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
+        conf, _ = torch.max(all_output, 1)
         if args.pl_type == 'spherical_kmeans':
             all_fea_norm = F.normalize(all_fea, dim=1)
-            kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000).fit(all_fea_norm)
+            kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
+                .fit(all_fea_norm, sample_weight=conf if args.weighted_samples else None)
         else:
-            kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000).fit(all_fea)
+            kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
+                .fit(all_fea, sample_weight=conf if args.weighted_samples else None)
 
         centroids = kmeans.cluster_centers_
 
         cdists = cdist(all_fea, centroids, metric='cosine')
         pred_label = cdists.argmin(axis=1)
         conf = softmax((1 - cdists) / args.pl_temperature, axis=1).max(axis=1)
-        cls_count = np.eye(K)[pred_label].sum(axis=0)
+        cls_count = np.eye(args.class_num)[pred_label].sum(axis=0)
         labelset = np.where(cls_count > args.threshold)
         labelset = labelset[0]
     else:
@@ -707,6 +711,7 @@ if __name__ == "__main__":
     parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--distance', type=str, default='cosine', choices=["euclidean", "cosine"])
     parser.add_argument('--pl_type', type=str, default="sspl", choices=["naive", "sspl", "kmeans", "spherical_kmeans"])
+    parser.add_argument('--weighted_samples', type=str2bool, default=False)
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--output_src', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda'])
