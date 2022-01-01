@@ -299,6 +299,11 @@ def image_train(args, resize_size=256, crop_size=224, alexnet=False):
         return transforms.Compose(trfs1)
 
 
+def image_pl(args):
+    trfs = get_image_transform(args.aug_pl, args)
+    return transforms.Compose(trfs)
+
+
 def image_test(args, resize_size=256, crop_size=224, alexnet=False):
     if not alexnet:
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],

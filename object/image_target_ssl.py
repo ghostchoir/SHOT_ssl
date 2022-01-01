@@ -113,7 +113,7 @@ def data_load(args):
         dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker,
                                             drop_last=True)
 
-        dsets["pl"] = ImageList_idx(txt_test, transform=image_test(args))
+        dsets["pl"] = ImageList_idx(txt_test, transform=image_pl(args))
 
         dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
@@ -744,6 +744,7 @@ if __name__ == "__main__":
     parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug_pl', type=str, default='test', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--ra_n', type=int, default=1)
     parser.add_argument('--ra_m', type=int, default=10)
     parser.add_argument('--sg3', type=str2bool, default=True)
