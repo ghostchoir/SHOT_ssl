@@ -663,17 +663,17 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
     print(log_str + '\n')
 
     if args.initial_centroid == 'raw':
-        centroids = initc.astype(float)
+        centroids = initc
     elif args.initial_centroid == 'hard':
-        centroids = c.astype(float)
+        centroids = c
 
     if args.momentum_cls < 1:
         m = args.momentum_cls
         device = inputs.get_device()
         if args.dataparallel:
-            netC.module.fc.weight.data = m * netC.module.fc.weight.data + (1-m) * torch.from_numpy(centroids).to(device)
+            netC.module.fc.weight.data = m * netC.module.fc.weight.data + (1-m) * torch.from_numpy(centroids).float().to(device)
         else:
-            netC.fc.weight.data = m * netC.fc.weight.data + (1-m) * torch.from_numpy(centroids).to(device)
+            netC.fc.weight.data = m * netC.fc.weight.data + (1-m) * torch.from_numpy(centroids).float().to(device)
 
     try:
         return pred_label.astype('int'), conf.cpu().numpy(), centroids, labelset
