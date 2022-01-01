@@ -371,6 +371,10 @@ def get_image_transform(mode, args, resize_size=256, crop_size=224):
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
         ]
+    elif mode == 'test':
+        trfs = [transforms.Resize((resize_size, resize_size)),
+                transforms.CenterCrop(crop_size),
+                transforms.ToTensor()]
 
     if args.norm_img:
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
