@@ -667,8 +667,8 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
     elif args.initial_centroid == 'hard':
         centroids = c
 
-    if args.momentum_update_cls < 1:
-        m = args.momentum_update_cls
+    if args.momentum_cls < 1:
+        m = args.momentum_cls
         device = inputs.get_device()
         if args.dataparallel:
             netC.module.fc.weight.data = m * netC.module.fc.weight.data + (1-m) * torch.from_numpy(centroids).to(device)
