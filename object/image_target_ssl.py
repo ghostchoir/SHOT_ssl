@@ -663,9 +663,9 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
     print(log_str + '\n')
 
     if args.initial_centroid == 'raw':
-        centroids = initc
+        centroids = initc.astype(float)
     elif args.initial_centroid == 'hard':
-        centroids = c
+        centroids = c.astype(float)
 
     if args.momentum_cls < 1:
         m = args.momentum_cls
