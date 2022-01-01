@@ -799,7 +799,7 @@ if __name__ == "__main__":
     parser.add_argument('--focal_alpha', type=float, default=0.5)
     parser.add_argument('--focal_gamma', type=float, default=2.0)
 
-    parser.add_argument('--skip_cls_first_iter', type=str2bool, default=False)
+    parser.add_argument('--skip_cls_first_iter', type=str2bool, default=True)
 
     parser.add_argument('--momentum_cls', type=float, default=1)
 
