@@ -597,14 +597,16 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
         conf, predict = torch.max(all_output, 1)
         accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
+
+        conf_thres_idx = np.where(conf >= args.pl_threshold)
         if args.pl_type == 'spherical_kmeans':
             weights = normalize(weights)
             all_fea_norm = F.normalize(all_fea, dim=1)
             kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
-                .fit(all_fea_norm, sample_weight=conf if args.weighted_samples else None)
+                .fit(all_fea_norm[conf_thres_idx], sample_weight=conf if args.weighted_samples else None)
         else:
             kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
-                .fit(all_fea, sample_weight=conf if args.weighted_samples else None)
+                .fit(all_fea[conf_thres_idx], sample_weight=conf if args.weighted_samples else None)
 
         initc = kmeans.cluster_centers_
 
@@ -804,6 +806,8 @@ if __name__ == "__main__":
     parser.add_argument('--skip_cls_first_iter', type=str2bool, default=True)
 
     parser.add_argument('--momentum_cls', type=float, default=1)
+
+    parser.add_argument('--pl_threshold', type=float, default=0)
 
     args = parser.parse_args()
 
