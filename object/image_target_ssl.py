@@ -667,6 +667,14 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
     elif args.initial_centroid == 'hard':
         centroids = c
 
+    if args.momentum_update_cls < 1:
+        m = args.momentum_update_cls
+        device = inputs.get_device()
+        if args.dataparallel:
+            netC.module.fc.weight.data = m * netC.module.fc.weight.data + (1-m) * torch.from_numpy(centroids).to(device)
+        else:
+            netC.fc.weight.data = m * netC.fc.weight.data + (1-m) * torch.from_numpy(centroids).to(device)
+
     try:
         return pred_label.astype('int'), conf.cpu().numpy(), centroids, labelset
     except:
@@ -792,6 +800,8 @@ if __name__ == "__main__":
     parser.add_argument('--focal_gamma', type=float, default=2.0)
 
     parser.add_argument('--skip_cls_first_iter', type=str2bool, default=False)
+
+    parser.add_argument('--momentum_cls', type=float, default=1)
 
     args = parser.parse_args()
 
