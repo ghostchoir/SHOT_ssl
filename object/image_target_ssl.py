@@ -429,15 +429,17 @@ def train_target(args):
         else:
             classifier_loss = torch.tensor(0.0).cuda()
 
-        if args.ent:
+        if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
             entropy_loss = torch.mean(loss.Entropy(softmax_out))
-            if args.gent:
-                msoftmax = softmax_out.mean(dim=0)
-                gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
-                entropy_loss -= gentropy_loss
             im_loss = entropy_loss * args.ent_par
             classifier_loss += im_loss
+
+        if args.gent_par > 0:
+            softmax_out = nn.Softmax(dim=1)(outputs_test)
+            msoftmax = softmax_out.mean(dim=0)
+            gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
+            classifier_loss -= args.gent_par * gentropy_loss
 
         if args.ssl_weight > 0:
             if args.ssl_before_btn:
@@ -716,6 +718,7 @@ if __name__ == "__main__":
     parser.add_argument('--cls_par', type=float, default=0.3)
     parser.add_argument('--cls_smooth', type=float, default=0)
     parser.add_argument('--ent_par', type=float, default=1.0)
+    parser.add_argument('--gent_par', type=float, default=1.0)
     parser.add_argument('--lr_decay1', type=float, default=0.1)
     parser.add_argument('--lr_decay2', type=float, default=1.0)
 
