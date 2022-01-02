@@ -424,7 +424,7 @@ def train_target(args):
                 classifier_loss += cls_loss_fn(c3[conf_cls >= args.conf_threshold],
                                                pred[conf_cls >= args.conf_threshold])
             classifier_loss *= args.cls_par
-            if iter_num < interval_iter and args.dset == "visda-c" and args.skip_cls_first_iter:
+            if iter_num < interval_iter and args.skip_cls_first_iter:
                 classifier_loss *= 0
         else:
             classifier_loss = torch.tensor(0.0).cuda()
