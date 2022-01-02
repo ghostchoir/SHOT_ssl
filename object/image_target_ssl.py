@@ -749,6 +749,7 @@ if __name__ == "__main__":
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')
+    parser.add_argument('--norm_img_mode', type=str, choices=['whitening', 'pmone'], default='whitening')
     parser.add_argument('--norm_feat', action='store_true')
     parser.add_argument('--norm_btn', action='store_true')
     parser.add_argument('--embedding_dim', type=int, default=128)

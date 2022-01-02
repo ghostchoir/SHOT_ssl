@@ -306,8 +306,12 @@ def image_pl(args):
 
 def image_test(args, resize_size=256, crop_size=224, alexnet=False):
     if not alexnet:
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
+        if args.norm_img_mode == 'whitening':
+            normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                             std=[0.229, 0.224, 0.225])
+        elif args.norm_img_mode == 'pmone':
+            normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
+                                             std=[0.5, 0.5, 0.5])
     else:
         normalize = Normalize(meanfile='./ilsvrc_2012_mean.npy')
 
@@ -382,8 +386,12 @@ def get_image_transform(mode, args, resize_size=256, crop_size=224):
                 transforms.ToTensor()]
 
     if args.norm_img:
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
+        if args.norm_img_mode == 'whitening':
+            normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                             std=[0.229, 0.224, 0.225])
+        elif args.norm_img_mode == 'pmone':
+            normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
+                                             std=[0.5, 0.5, 0.5])
         trfs.append(normalize)
 
     return trfs
