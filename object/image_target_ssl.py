@@ -608,10 +608,10 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
                 weights = normalize(weights)
             all_fea_norm = F.normalize(all_fea, dim=1)
             kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
-                .fit(all_fea_norm[conf_thres_idx], sample_weight=conf if args.weighted_samples else None)
+                .fit(all_fea_norm[conf_thres_idx], sample_weight=conf[conf_thres_idx] if args.weighted_samples else None)
         else:
             kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
-                .fit(all_fea[conf_thres_idx], sample_weight=conf if args.weighted_samples else None)
+                .fit(all_fea[conf_thres_idx], sample_weight=conf[conf_thres_idx] if args.weighted_samples else None)
 
         initc = kmeans.cluster_centers_
 
