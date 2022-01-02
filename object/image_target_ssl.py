@@ -604,7 +604,8 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
 
         conf_thres_idx = np.where(conf >= args.pl_threshold)
         if args.pl_type == 'spherical_kmeans':
-            weights = normalize(weights)
+            if args.init_centroids_with_cls:
+                weights = normalize(weights)
             all_fea_norm = F.normalize(all_fea, dim=1)
             kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
                 .fit(all_fea_norm[conf_thres_idx], sample_weight=conf if args.weighted_samples else None)
