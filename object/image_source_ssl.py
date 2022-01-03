@@ -14,7 +14,7 @@ from data_list import ImageList
 from data import *
 import random, pdb, math, copy
 from tqdm import tqdm
-from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss, LabelSmoothedSCLLoss, Entropy, FocalLoss
+from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss, LabelSmoothedSCLLoss, Entropy, FocalLoss, JSDivLoss
 from scipy.spatial.distance import cdist
 from sklearn.metrics import confusion_matrix
 from sklearn.cluster import KMeans
@@ -373,6 +373,8 @@ def train_source(args):
             dist = nn.BCEWithLogitsLoss(reduction='sum').cuda()
         elif args.cr_metric == 'kl':
             dist = nn.KLDivLoss(reduction='sum').cuda()
+        elif args.cr_metric == 'js':
+            dist = JSDivLoss(reduction='sum').cuda()
 
     use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (args.ssl_weight > 0)
     use_third_pass = (args.cr_weight > 0) or (args.ssl_task in ['crsc', 'crs'] and args.ssl_weight > 0) or (args.cls3)
@@ -442,8 +444,9 @@ def train_source(args):
             elif args.cr_site == 'cls':
                 f_hard = outputs_source
                 f_weak = c3
-                if args.cr_metric != 'cos':
+                if args.cr_metric in ['kl', 'js']:
                     f_hard = F.softmax(f_hard, dim=-1)
+                if args.cr_metric in ['bce', 'kl', 'js']:
                     f_weak = F.softmax(f_weak, dim=-1)
             else:
                 raise NotImplementedError
@@ -682,7 +685,7 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
-    parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce', 'kl'])
+    parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce', 'kl', 'js'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
     parser.add_argument('--cr_threshold', type=float, default=1.0)
     parser.add_argument('--angular_temp', type=float, default=0.1)

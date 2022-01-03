@@ -8,6 +8,7 @@ import pdb
 import warnings
 from typing import Optional
 from kornia.utils.one_hot import one_hot
+from kornia.losses import js_div_loss_2d
 
 
 def Entropy(input_):
@@ -443,3 +444,12 @@ class FocalLoss(nn.Module):
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         return focal_loss(input, target, self.alpha, self.gamma, self.reduction, self.eps)
+
+
+class JSDivLoss(nn.Module):
+    def __init__(self, reduction='mean'):
+        super(JSDivLoss, self).__init__()
+        self.reduction = reduction
+
+    def forward(self, p, q):
+        return js_div_loss_2d(p, q, self.reduction)
