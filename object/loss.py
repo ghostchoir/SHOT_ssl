@@ -452,4 +452,8 @@ class JSDivLoss(nn.Module):
         self.reduction = reduction
 
     def forward(self, p, q):
-        return js_div_loss_2d(p, q, self.reduction)
+        m = 0.5 * (F.softmax(p, dim=1) + F.softmax(q, dim=1))
+        loss = 0.5 * F.kl_div(F.log_softmax(p, dim=1), m, reduction=self.reduction)\
+               + 0.5 * F.kl_div(F.log_softmax(q, dim=1), m, reduction=self.reduction)
+
+        return loss

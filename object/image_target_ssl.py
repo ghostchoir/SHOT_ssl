@@ -408,9 +408,9 @@ def train_target(args):
             elif args.cr_site == 'cls':
                 f_hard = outputs_test
                 f_weak = c3
-                if args.cr_metric in ['kl', 'js']:
-                    f_hard = F.softmax(f_hard, dim=-1)
-                if args.cr_metric in ['bce', 'kl', 'js']:
+                if args.cr_metric == 'kl':
+                    f_hard = F.log_softmax(f_hard, dim=-1)
+                if args.cr_metric in ['bce', 'kl']:
                     f_weak = F.softmax(f_weak, dim=-1)
             else:
                 raise NotImplementedError
