@@ -227,16 +227,8 @@ def train_target(args):
         netB.cuda()
         netC.cuda()
 
-    if args.calibrate_running_stats and args.classifier == 'bn':
-        mean, var = obtain_bn_stats(dset_loaders['pl'], netF, netB, args)
-        if args.dataparallel:
-            device = netB.module.norm.running_mean.get_device()
-            netB.module.norm.running_mean = mean.to(device)
-            netB.module.norm.running_var = var.to(device)
-        else:
-            device = netB.norm.running_mean.get_device()
-            netB.norm.running_mean = mean.to(device)
-            netB.norm.running_var = var.to(device)
+    if args.f_calibrate_mode != 'none' and args.b_calibrate_mode != 'none':
+        calibrate_bn_stats(dset_loaders['pl'], netF, netB, args)
 
     param_group = []
     for k, v in netF.named_parameters():
@@ -478,7 +470,10 @@ def train_target(args):
 
         if args.cr_weight > 0:
             try:
-                cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak[conf >= args.cr_threshold]).mean()
+                if args.sg3_cr and not args.sg3:
+                    cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak.detach()[conf >= args.cr_threshold]).mean()
+                else:
+                    cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak[conf >= args.cr_threshold]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
@@ -693,6 +688,41 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         return pred_label.astype('int'), conf, centroids, labelset
 
 
+def calibrate_bn_stats(loader, netF, netB, args):
+    if args.f_calibrate_mode in ['reset', 'offline']:
+        bn_count = 0
+        for layer in netF.modules():
+            if isinstance(layer, torch.nn.BatchNorm2d):
+                bn_count += 1
+                layer.running_mean.fill_(0.)
+                layer.running_var.fill_(1.)
+        print('Reset' + str(bn_count) + 'BN layers in netF')
+    if args.b_calibrate_mode in ['reset', 'offline'] and args.classifier == 'bn':
+        bn_count = 0
+        for layer in netB.modules():
+            if isinstance(layer, torch.nn.BatchNorm1d):
+                bn_count += 1
+                layer.running_mean.fill_(0.)
+                layer.running_var.fill_(1.)
+        print('Reset' + str(bn_count) + 'BN layers in netB')
+
+    if args.f_calibrate_mode in ['offline', 'mixed'] or args.b_calibrate_mode in ['offline', 'mixed']:
+        netF.train()
+        netB.train()
+        with torch.no_grad():
+            iter_test = iter(loader)
+            for _ in range(len(loader)):
+                data = iter_test.next()
+
+                inputs = data[0]
+                #labels = data[1]
+                #tar_idx = data[2]
+                inputs = inputs.cuda()
+                feas = netB(netF(inputs))
+        netF.eval()
+        netB.eval()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SHOT')
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
@@ -770,6 +800,7 @@ if __name__ == "__main__":
     parser.add_argument('--ra_n', type=int, default=1)
     parser.add_argument('--ra_m', type=int, default=10)
     parser.add_argument('--sg3', type=str2bool, default=True)
+    parser.add_argument('--sg3_cr', type=str2bool, default=True)
     parser.add_argument('--cls3', type=str2bool, default=False)
     parser.add_argument('--aug_strength', type=float, default=1.0)
     parser.add_argument('--custom_scale', default=True, type=str2bool)
@@ -795,7 +826,8 @@ if __name__ == "__main__":
     parser.add_argument('--initial_btn_iter', type=int, default=0)
     parser.add_argument('--reset_running_stats', type=str2bool, default=False)
     parser.add_argument('--reset_bn_params', type=str2bool, default=False)
-    parser.add_argument('--calibrate_running_stats', type=str2bool, default=False)
+    parser.add_argument('--f_calibrate_mode', type=str, choices=['none', 'reset', 'offline', 'mixed'], default='none')
+    parser.add_argument('--b_calibrate_mode', type=str, choices=['none', 'reset', 'offline', 'mixed'], default='none')
     parser.add_argument('--unbiased_var', type=str2bool, default=True)
 
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
