@@ -227,7 +227,7 @@ def train_target(args):
         netB.cuda()
         netC.cuda()
 
-    if args.f_calibrate_mode != 'none' and args.b_calibrate_mode != 'none':
+    if args.f_calibrate_mode != 'none' or args.b_calibrate_mode != 'none':
         calibrate_bn_stats(dset_loaders['pl'], netF, netB, args)
 
     param_group = []
