@@ -428,6 +428,8 @@ def train_target(args):
             softmax_out = nn.Softmax(dim=1)(outputs_test)
             entropy_loss = torch.mean(loss.Entropy(softmax_out))
             im_loss = entropy_loss * args.ent_par
+            if iter_num < interval_iter and args.skip_minent_first_iter:
+                im_loss *= 0
             classifier_loss += im_loss
 
         if args.gent_par > 0:
@@ -846,6 +848,7 @@ if __name__ == "__main__":
     parser.add_argument('--focal_gamma', type=float, default=2.0)
 
     parser.add_argument('--skip_cls_first_iter', type=str2bool, default=True)
+    parser.add_argument('--skip_minent_first_iter', type=str2bool, default=False)
 
     parser.add_argument('--momentum_cls', type=float, default=1)
 
