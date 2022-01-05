@@ -427,7 +427,7 @@ def train_target(args):
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
             entropy_loss = torch.mean(loss.Entropy(softmax_out))
-            if args.minent_scheduling == 'const':
+            if args.minent_scheduling in ['const', 'step']:
                 im_loss = entropy_loss * args.ent_par
             elif args.minent_scheduling == 'linear':
                 im_loss = entropy_loss * args.ent_par * iter_num / max_iter
