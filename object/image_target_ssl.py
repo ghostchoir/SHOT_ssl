@@ -427,8 +427,11 @@ def train_target(args):
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
             entropy_loss = torch.mean(loss.Entropy(softmax_out))
-            im_loss = entropy_loss * args.ent_par
-            if iter_num < interval_iter * args.skip_multiplier and args.skip_minent_first_iter:
+            if args.minent_scheduling == 'const':
+                im_loss = entropy_loss * args.ent_par
+            elif args.minent_scheduling == 'linear':
+                im_loss = entropy_loss * args.ent_par * iter_num / max_iter
+            if iter_num < interval_iter * args.skip_multiplier and args.minent_scheduling == 'step':
                 im_loss *= 0
             classifier_loss += im_loss
 
@@ -848,7 +851,6 @@ if __name__ == "__main__":
     parser.add_argument('--focal_gamma', type=float, default=2.0)
 
     parser.add_argument('--skip_cls_first_iter', type=str2bool, default=True)
-    parser.add_argument('--skip_minent_first_iter', type=str2bool, default=False)
     parser.add_argument('--skip_multiplier', type=float, default=1.0)
 
     parser.add_argument('--momentum_cls', type=float, default=1)
@@ -856,6 +858,9 @@ if __name__ == "__main__":
     parser.add_argument('--pl_threshold', type=float, default=0)
 
     parser.add_argument('--init_centroids_with_cls', type=str2bool, default=True)
+
+    parser.add_argument('--minent_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
+
 
     args = parser.parse_args()
 
