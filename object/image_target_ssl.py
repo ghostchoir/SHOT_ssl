@@ -485,7 +485,15 @@ def train_target(args):
             except:
                 print('Error computing CR loss')
                 cr_loss = torch.tensor(0.0).cuda()
-            classifier_loss += args.cr_weight * cr_loss
+            if args.cr_scheduling == 'const':
+                classifier_loss += args.cr_weight * cr_loss
+            elif args.cr_scheduling == 'linear':
+                classifier_loss += args.cr_weight * cr_loss * iter_num / max_iter
+            elif args.cr_scheduling == 'step':
+                if iter_num < interval_iter * args.skip_multiplier:
+                    pass
+                else:
+                    classifier_loss += args.cr_weight * cr_loss
 
         optimizer.zero_grad()
         classifier_loss.backward()
@@ -860,6 +868,7 @@ if __name__ == "__main__":
     parser.add_argument('--init_centroids_with_cls', type=str2bool, default=True)
 
     parser.add_argument('--minent_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
+    parser.add_argument('--cr_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
 
 
     args = parser.parse_args()
