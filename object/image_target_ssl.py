@@ -418,8 +418,11 @@ def train_target(args):
             if args.cls3:
                 classifier_loss += cls_loss_fn(c3[conf_cls >= args.conf_threshold],
                                                pred[conf_cls >= args.conf_threshold])
-            classifier_loss *= args.cls_par
-            if iter_num < interval_iter * args.skip_multiplier and args.skip_cls_first_iter:
+            if args.cls_scheduling in ['const', 'step']:
+                classifier_loss *= args.cls_par
+            elif args.cls_scheduling == 'linear':
+                classifier_loss *= (args.cls_par * iter_num / max_iter)
+            if iter_num < interval_iter * args.skip_multiplier and args.cls_scheduling == 'step':
                 classifier_loss *= 0
         else:
             classifier_loss = torch.tensor(0.0).cuda()
@@ -858,7 +861,6 @@ if __name__ == "__main__":
     parser.add_argument('--focal_alpha', type=float, default=0.5)
     parser.add_argument('--focal_gamma', type=float, default=2.0)
 
-    parser.add_argument('--skip_cls_first_iter', type=str2bool, default=True)
     parser.add_argument('--skip_multiplier', type=float, default=1.0)
 
     parser.add_argument('--momentum_cls', type=float, default=1)
@@ -869,6 +871,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--minent_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
     parser.add_argument('--cr_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
+    parser.add_argument('--cls_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
 
 
     args = parser.parse_args()
