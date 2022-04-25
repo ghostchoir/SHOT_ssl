@@ -326,6 +326,10 @@ def train_target(args):
                 device = netC.fc.weight.device
                 netC.fc.weight.data = torch.from_numpy(centroids).float().to(device)
 
+        if args.cls_discrepancy_weight > 0:
+            centroids = torch.from_numpy(centroids).float().to(device)
+            centroids.requires_grad = False
+            centroids = F.normalize(centroids, dim=1)
         inputs_test1 = None
         inputs_test2 = None
         inputs_test3 = None
@@ -426,6 +430,11 @@ def train_target(args):
                 classifier_loss *= 0
         else:
             classifier_loss = torch.tensor(0.0).cuda()
+
+        if args.cls_discrepancy_weight > 0:
+            c_ccc = F.normalize(b1, dim=1) @ centroids.T / args.angular_temp
+
+            classifier_loss += args.cls_discrepancy_weight * JSDivLoss()(outputs_test, c_ccc)
 
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
@@ -873,6 +882,7 @@ if __name__ == "__main__":
     parser.add_argument('--cr_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
     parser.add_argument('--cls_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
 
+    parser.add_argument('--cls_discrepancy_weight', type=float, default=0.0)
 
     args = parser.parse_args()
 
