@@ -380,7 +380,10 @@ def train_target(args):
         if args.upper_bound_run:
             pred = labels_test.cuda()
         else:
-            pred = mem_label[tar_idx]
+            if mem_label is not None:
+                pred = mem_label[tar_idx]
+            else:
+                pred = None
 
         if iter_num < args.initial_btn_iter:
             netF.eval()
