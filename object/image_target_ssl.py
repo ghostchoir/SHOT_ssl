@@ -455,7 +455,7 @@ def train_target(args):
         else:
             classifier_loss = torch.tensor(0.0).cuda()
 
-        if args.cls_discrepancy_weight > 0 and not args.cls_discrepancy_c_update:
+        if iter_num % args.cls_discrepancy_freq == 0 and args.cls_discrepancy_weight > 0 and not args.cls_discrepancy_c_update:
             with torch.set_grad_enabled(not args.freeze_ccc):
                 c_ccc = F.normalize(b1, dim=1) @ centroids.T / args.ccc_temp
 
@@ -536,7 +536,7 @@ def train_target(args):
         classifier_loss.backward()
         optimizer.step()
 
-        if args.cls_discrepancy_weight > 0 and args.cls_discrepancy_c_update:
+        if iter_num % args.cls_discrepancy_freq == 0 and args.cls_discrepancy_weight > 0 and args.cls_discrepancy_c_update:
             b1 = netB(netF(inputs_test1))
             c1 = netC(b1, labels_forward)
             with torch.set_grad_enabled(not args.freeze_ccc):
@@ -921,6 +921,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--cls_discrepancy_weight', type=float, default=0.0)
     parser.add_argument('--cls_discrepancy_c_update', type=str2bool, default=False)
+    parser.add_argument('--cls_discrepancy_freq', type=int, default=100)
     parser.add_argument('--freeze_ccc', type=str2bool, default=True)
     parser.add_argument('--ccc_temp', type=float, default=1.0)
 
