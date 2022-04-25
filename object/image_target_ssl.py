@@ -327,7 +327,7 @@ def train_target(args):
                 netC.fc.weight.data = torch.from_numpy(centroids).float().to(device)
 
         if args.cls_discrepancy_weight > 0:
-            centroids = torch.from_numpy(centroids).float().to(device)
+            centroids = torch.from_numpy(centroids).float().cuda()
             centroids.requires_grad = False
             centroids = F.normalize(centroids, dim=1)
         inputs_test1 = None
