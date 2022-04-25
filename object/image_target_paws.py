@@ -70,11 +70,11 @@ def data_load(args):
 
         dsets["pl"] = cifar10c_dset_idx(args)
 
-        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * args.eval_batch_mult, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
 
         dsets["test"] = cifar10c_dset_idx(args)
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
     elif args.dset == 'CIFAR-100-C':
         dsets["target"] = cifar100c_dset_idx(args)
@@ -84,10 +84,10 @@ def data_load(args):
 
         dsets["pl"] = cifar100c_dset_idx(args)
 
-        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * args.eval_batch_mult, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
         dsets["test"] = cifar100c_dset_idx(args)
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
     else:
         txt_tar = open(args.t_dset_path).readlines()
@@ -118,11 +118,11 @@ def data_load(args):
 
         dsets["pl"] = ImageList_idx(txt_test, transform=image_pl(args))
 
-        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * args.eval_batch_mult, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
 
         dsets["test"] = ImageList_idx(txt_test, transform=image_test(args))
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
 
     return dset_loaders
@@ -826,6 +826,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_epoch', type=int, default=15, help="max iterations")
     parser.add_argument('--interval', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
+    parser.add_argument('--eval_batch_mult', type=int, default=8)
     parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
     parser.add_argument('--gamma', type=float, default=10)
     parser.add_argument('--power', type=float, default=0.75)
