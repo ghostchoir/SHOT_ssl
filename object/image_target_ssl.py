@@ -951,6 +951,8 @@ if __name__ == "__main__":
     parser.add_argument('--separate_wd', type=str2bool, default=False)
 
     parser.add_argument('--initial_memax', type=int, default=100)
+    parser.add_argument('--wa_to_memax', type=str2bool, default=True)
+    parser.add_argument('--memax_print_freq', type=int, default=10)
 
     args = parser.parse_args()
 
