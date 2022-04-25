@@ -438,31 +438,6 @@ def train_target(args):
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
 
-        if args.paws_weight > 0:
-            inputs_hc, labels_hc, _ = iter_hc.next()
-
-            inputs_hc = inputs_hc[0].cuda()
-            b_hc = netB(netF(inputs_hc))
-            labels_hc = labels_hc.cuda()
-            labels_hc_onehot = F.one_hot(labels_hc, num_classes=args.class_num)\
-                               * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
-            labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
-
-            paws_p1 = snn(b3, b_hc, labels_hc_onehot)
-
-            if args.paws_detach:
-                b1_detach = b1.clone().detach()
-                b_hc_detach = b_hc.clone().detach()
-            else:
-                b1_detach = b1
-                b_hc_detach = b_hc
-
-            paws_p2 = snn(b1_detach, b_hc_detach, labels_hc_onehot)
-
-            paws_loss = paws(paws_p1, paws_p2)
-
-            classifier_loss += args.paws_weight * paws_loss
-
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
                 f_hard = f1
@@ -499,6 +474,31 @@ def train_target(args):
                 classifier_loss *= 0
         else:
             classifier_loss = torch.tensor(0.0).cuda()
+
+        if args.paws_weight > 0:
+            inputs_hc, labels_hc, _ = iter_hc.next()
+
+            inputs_hc = inputs_hc[0].cuda()
+            b_hc = netB(netF(inputs_hc))
+            labels_hc = labels_hc.cuda()
+            labels_hc_onehot = F.one_hot(labels_hc, num_classes=args.class_num)\
+                               * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
+            labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
+
+            paws_p1 = snn(b3, b_hc, labels_hc_onehot)
+
+            if args.paws_detach:
+                b1_detach = b1.clone().detach()
+                b_hc_detach = b_hc.clone().detach()
+            else:
+                b1_detach = b1
+                b_hc_detach = b_hc
+
+            paws_p2 = snn(b1_detach, b_hc_detach, labels_hc_onehot)
+
+            paws_loss = paws(paws_p1, paws_p2)
+
+            classifier_loss += args.paws_weight * paws_loss
 
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
