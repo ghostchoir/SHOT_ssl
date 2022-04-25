@@ -288,7 +288,7 @@ def train_target(args):
             dist = JSDivLoss(reduction='sum').cuda()
 
     use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (args.ssl_weight > 0)
-    use_third_pass = (args.cr_weight > 0) or (args.ssl_task in ['crsc', 'crs'] and args.ssl_weight > 0) or (args.cls3)
+    use_third_pass = (args.paws_weight > 0) or (args.cr_weight > 0) or (args.ssl_task in ['crsc', 'crs'] and args.ssl_weight > 0) or (args.cls3)
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
