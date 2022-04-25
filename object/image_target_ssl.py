@@ -302,6 +302,29 @@ def train_target(args):
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
 
+    if args.initial_memax > 0:
+        from paws import maxent_step
+        memax_iter = 0
+        memax_max_iter = args.initial_memax
+
+        iter_memax = iter(dset_loaders["target"])
+
+        while memax_iter < memax_max_iter:
+            inputs, labels, tar_idx = iter_memax.next()
+
+            if args.wa_to_memax:
+                inputs = inputs[2].cuda()
+            else:
+                inputs = inputs[0].cuda()
+
+            ent, gent = maxent_step(inputs, netF, netH, netB, netC, optimizer)
+            memax_iter += 1
+            if memax_iter % args.memax_print_freq == 0:
+                print("Iter {:3d}/{:3d} Ent {:.3f} Gent {:.3f}".format(memax_iter, memax_max_iter, ent, gent))
+
+        optimizer = optim.SGD(param_group)
+        optimizer = op_copy(optimizer)
+
     c_optimizer = optim.SGD(c_param_group)
     c_optimizer = op_copy(c_optimizer)
 
@@ -926,6 +949,8 @@ if __name__ == "__main__":
     parser.add_argument('--ccc_temp', type=float, default=1.0)
 
     parser.add_argument('--separate_wd', type=str2bool, default=False)
+
+    parser.add_argument('--initial_memax', type=int, default=100)
 
     args = parser.parse_args()
 
