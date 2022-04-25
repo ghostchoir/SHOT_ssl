@@ -48,7 +48,7 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
             decay = np.cos((iter_num - warmup_iter) * np.pi / (2 * (max_iter - warmup_iter)))
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr0'] * decay
-        param_group['weight_decay'] = args.weight_decay
+        #param_group['weight_decay'] = args.weight_decay
         param_group['momentum'] = 0.9
         param_group['nesterov'] = True
     return optimizer
@@ -212,7 +212,7 @@ def train_target(args):
     modelpath = args.output_dir_src + '/source_C.pt'
     netC.load_state_dict(torch.load(modelpath), strict=False)
     cls_weights = copy.deepcopy(netC.fc.weight.data).numpy()
-    netC.eval()
+    #netC.eval()
     for k, v in netC.named_parameters():
         v.requires_grad = False
 
@@ -233,19 +233,39 @@ def train_target(args):
     param_group = []
     for k, v in netF.named_parameters():
         if args.lr_decay1 > 0:
-            param_group += [{'params': v, 'lr': args.lr * args.lr_decay1}]
+            if args.separate_wd and ('bias' in k or 'norm' in k):
+                param_group += [{'params': v, 'lr': args.lr * args.lr_decay1, 'weight_decay': 0}]
+            else:
+                param_group += [{'params': v, 'lr': args.lr * args.lr_decay1, 'weight_decay': args.weight_decay}]
         else:
             v.requires_grad = False
     for k, v in netB.named_parameters():
         if args.lr_decay2 > 0:
-            param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
+            if args.separate_wd and ('bias' in k or 'norm' in k):
+                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': 0}]
+            else:
+                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': args.weight_decay}]
         else:
             v.requires_grad = False
     for k, v in netH.named_parameters():
         if args.lr_decay2 > 0:
-            param_group += [{'params': v, 'lr': args.lr * args.lr_decay2}]
+            if args.separate_wd and ('bias' in k or 'norm' in k):
+                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': 0}]
+            else:
+                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': args.weight_decay}]
         else:
             v.requires_grad = False
+
+    c_param_group = []
+    for k, v in netC.named_parameters():
+        for k, v in netC.named_parameters():
+            if args.lr_decay2 > 0:
+                if args.separate_wd and ('bias' in k or 'norm' in k):
+                    c_param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': 0}]
+                else:
+                    c_param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': args.weight_decay}]
+            else:
+                v.requires_grad = False
 
     if args.use_focal_loss:
         cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma, reduction='mean')
@@ -281,6 +301,9 @@ def train_target(args):
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
+
+    c_optimizer = optim.SGD(c_param_group)
+    c_optimizer = op_copy(c_optimizer)
 
     max_iter = args.max_epoch * len(dset_loaders["target"])
     interval_iter = max_iter // args.interval
@@ -433,7 +456,8 @@ def train_target(args):
             classifier_loss = torch.tensor(0.0).cuda()
 
         if args.cls_discrepancy_weight > 0:
-            c_ccc = F.normalize(b1, dim=1) @ centroids.T / args.angular_temp
+            with torch.no_grad():
+                c_ccc = F.normalize(b1, dim=1) @ centroids.T / args.angular_temp
 
             classifier_loss += args.cls_discrepancy_weight * JSDivLoss()(outputs_test, c_ccc)
 
@@ -885,6 +909,9 @@ if __name__ == "__main__":
     parser.add_argument('--cls_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
 
     parser.add_argument('--cls_discrepancy_weight', type=float, default=0.0)
+    parser.add_argument('--ccc_temp', type=float, default=1.0)
+
+    parser.add_argument('--separate_wd', type=str2bool, default=False)
 
     args = parser.parse_args()
 
