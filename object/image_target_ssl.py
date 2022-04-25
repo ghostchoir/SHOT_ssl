@@ -68,11 +68,11 @@ def data_load(args):
 
         dsets["pl"] = cifar10c_dset_idx(args)
 
-        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * args.eval_batch_mult, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
 
         dsets["test"] = cifar10c_dset_idx(args)
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
     elif args.dset == 'CIFAR-100-C':
         dsets["target"] = cifar100c_dset_idx(args)
@@ -82,10 +82,10 @@ def data_load(args):
 
         dsets["pl"] = cifar100c_dset_idx(args)
 
-        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * args.eval_batch_mult, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
         dsets["test"] = cifar100c_dset_idx(args)
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
     else:
         txt_tar = open(args.t_dset_path).readlines()
@@ -116,11 +116,11 @@ def data_load(args):
 
         dsets["pl"] = ImageList_idx(txt_test, transform=image_pl(args))
 
-        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * 4, shuffle=False, num_workers=args.worker,
+        dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * args.eval_batch_mult, shuffle=False, num_workers=args.worker,
                                         drop_last=False)
 
         dsets["test"] = ImageList_idx(txt_test, transform=image_test(args))
-        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
+        dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
 
     return dset_loaders
@@ -318,6 +318,11 @@ def train_target(args):
             netH.train()
             netB.train()
 
+            if args.cls_discrepancy_weight > 0:
+                centroids = torch.from_numpy(centroids).float().cuda()
+                centroids.requires_grad = False
+                centroids = F.normalize(centroids, dim=1)
+
         if iter_num == 0 and args.calibrate_cls_weights:
             if args.dataparallel:
                 device = netC.module.fc.weight.device
@@ -326,10 +331,6 @@ def train_target(args):
                 device = netC.fc.weight.device
                 netC.fc.weight.data = torch.from_numpy(centroids).float().to(device)
 
-        if args.cls_discrepancy_weight > 0:
-            centroids = torch.from_numpy(centroids).float().cuda()
-            centroids.requires_grad = False
-            centroids = F.normalize(centroids, dim=1)
         inputs_test1 = None
         inputs_test2 = None
         inputs_test3 = None
@@ -756,6 +757,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_epoch', type=int, default=15, help="max iterations")
     parser.add_argument('--interval', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
+    parser.add_argument('--eval_batch_mult', type=int, default=8)
     parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
     parser.add_argument('--gamma', type=float, default=10)
     parser.add_argument('--power', type=float, default=0.75)
