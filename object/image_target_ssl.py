@@ -455,11 +455,11 @@ def train_target(args):
         else:
             classifier_loss = torch.tensor(0.0).cuda()
 
-        if args.cls_discrepancy_weight > 0:
-            with torch.no_grad():
-                c_ccc = F.normalize(b1, dim=1) @ centroids.T / args.angular_temp
+        if args.cls_discrepancy_weight > 0 and not args.cls_discrepancy_c_update:
+            with torch.set_grad_enabled(not args.freeze_ccc):
+                c_ccc = F.normalize(b1, dim=1) @ centroids.T / args.ccc_temp
 
-            classifier_loss += args.cls_discrepancy_weight * JSDivLoss()(outputs_test, c_ccc)
+            classifier_loss += args.cls_discrepancy_weight * JSDivLoss(reduction='sum')(outputs_test, c_ccc)
 
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
@@ -535,6 +535,15 @@ def train_target(args):
         optimizer.zero_grad()
         classifier_loss.backward()
         optimizer.step()
+
+        if args.cls_discrepancy_weight > 0 and args.cls_discrepancy_c_update:
+            with torch.set_grad_enabled(not args.freeze_ccc):
+                c_ccc = F.normalize(b1, dim=1) @ centroids.T / args.ccc_temp
+
+            cls_dis_loss = args.cls_discrepancy_weight * JSDivLoss(reduction='sum')(outputs_test, c_ccc)
+            c_optimizer.zero_grad()
+            cls_dis_loss.backward()
+            c_optimizer.step()
 
         if iter_num % interval_iter == 0 or iter_num == max_iter:
             netF.eval()
@@ -909,6 +918,8 @@ if __name__ == "__main__":
     parser.add_argument('--cls_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
 
     parser.add_argument('--cls_discrepancy_weight', type=float, default=0.0)
+    parser.add_argument('--cls_discrepancy_c_update', type=str2bool, default=False)
+    parser.add_argument('--freeze_ccc', type=str2bool, default=True)
     parser.add_argument('--ccc_temp', type=float, default=1.0)
 
     parser.add_argument('--separate_wd', type=str2bool, default=False)
