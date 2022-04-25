@@ -348,7 +348,6 @@ def train_target(args):
             hc_set.imgs = hc_imgs
             hc_loader = DataLoader(hc_set, batch_size=args.class_num * args.paws_batch_size, shuffle=True,
                                    num_workers=args.worker, drop_last=True)
-            iter_hc = iter(hc_loader)
 
         if iter_num % interval_iter == 0 and (args.cls_par > 0 or args.ssl_task in ['supcon', 'ls_supcon', 'crsc']):
             netF.eval()
@@ -476,7 +475,11 @@ def train_target(args):
             classifier_loss = torch.tensor(0.0).cuda()
 
         if args.paws_weight > 0:
-            inputs_hc, labels_hc, _ = iter_hc.next()
+            try:
+                inputs_hc, labels_hc, _ = iter_hc.next()
+            except:
+                iter_hc = iter(hc_loader)
+                inputs_hc, labels_hc, _ = iter_hc.next()
 
             inputs_hc = inputs_hc[0].cuda()
             b_hc = netB(netF(inputs_hc))
