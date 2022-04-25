@@ -537,10 +537,12 @@ def train_target(args):
         optimizer.step()
 
         if args.cls_discrepancy_weight > 0 and args.cls_discrepancy_c_update:
+            b1 = netB(netF(inputs_test1))
+            c1 = netC(b1, labels_forward)
             with torch.set_grad_enabled(not args.freeze_ccc):
                 c_ccc = F.normalize(b1, dim=1) @ centroids.T / args.ccc_temp
 
-            cls_dis_loss = args.cls_discrepancy_weight * JSDivLoss(reduction='sum')(outputs_test, c_ccc)
+            cls_dis_loss = args.cls_discrepancy_weight * JSDivLoss(reduction='sum')(c1, c_ccc)
             c_optimizer.zero_grad()
             cls_dis_loss.backward()
             c_optimizer.step()
