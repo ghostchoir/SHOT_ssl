@@ -315,13 +315,25 @@ def train_source(args):
     param_group = []
     learning_rate = args.lr
     for k, v in netF.named_parameters():
-        param_group += [{'params': v, 'lr': learning_rate * 0.1}]
+        if args.separate_wd and ('bias' in k or 'norm' in k):
+            param_group += [{'params': v, 'lr': learning_rate * 0.1, 'weight_decay': 0}]
+        else:
+            param_group += [{'params': v, 'lr': learning_rate * 0.1, 'weight_decay': args.weight_decay}]
     for k, v in netH.named_parameters():
-        param_group += [{'params': v, 'lr': learning_rate}]
+        if args.separate_wd and ('bias' in k or 'norm' in k):
+            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': 0}]
+        else:
+            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': args.weight_decay}]
     for k, v in netB.named_parameters():
-        param_group += [{'params': v, 'lr': learning_rate}]
+        if args.separate_wd and ('bias' in k or 'norm' in k):
+            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': 0}]
+        else:
+            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': args.weight_decay}]
     for k, v in netC.named_parameters():
-        param_group += [{'params': v, 'lr': learning_rate}]
+        if args.separate_wd and ('bias' in k or 'norm' in k):
+            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': 0}]
+        else:
+            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': args.weight_decay}]
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
@@ -732,6 +744,8 @@ if __name__ == "__main__":
     parser.add_argument('--use_focal_loss', type=str2bool, default=False)
     parser.add_argument('--focal_alpha', type=float, default=0.5)
     parser.add_argument('--focal_gamma', type=float, default=2.0)
+
+    parser.add_argument('--separate_wd', type=str2bool, default=False)
 
     args = parser.parse_args()
 
