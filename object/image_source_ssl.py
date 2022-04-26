@@ -516,15 +516,16 @@ def train_source(args):
         else:
             cr_loss = torch.tensor(0.0).cuda()
 
-        if args.im_weight > 0:
+        if args.ent_weight > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_source)
             entropy_loss = torch.mean(Entropy(softmax_out))
-            if args.gent:
-                msoftmax = softmax_out.mean(dim=0)
-                gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
-                entropy_loss -= gentropy_loss
-            im_loss = entropy_loss * args.im_weight
-            classifier_loss += im_loss
+            classifier_loss += args.ent_weight * entropy_loss
+
+        if args.gent_weight > 0:
+            softmax_out = nn.Softmax(dim=1)(outputs_source)
+            msoftmax = softmax_out.mean(dim=0)
+            gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
+            classifier_loss -= args.gent_weight * gentropy_loss
 
         loss = classifier_loss + args.ssl_weight * ssl_loss + args.cr_weight * cr_loss
 
@@ -746,6 +747,9 @@ if __name__ == "__main__":
     parser.add_argument('--focal_gamma', type=float, default=2.0)
 
     parser.add_argument('--separate_wd', type=str2bool, default=False)
+
+    parser.add_argument('--ent_weight', type=float, default=0)
+    parser.add_argument('--gent_weight', type=float, default=1.0)
 
     args = parser.parse_args()
 
