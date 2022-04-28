@@ -364,7 +364,7 @@ def train_target(args):
             netH.train()
             netB.train()
 
-            if args.cls_dis_weight > 0:
+            if args.cls_dis_weight != 0:
                 centroids = torch.from_numpy(centroids).float().cuda()
                 centroids.requires_grad = False
                 centroids = F.normalize(centroids, dim=1)
@@ -478,7 +478,7 @@ def train_target(args):
         else:
             classifier_loss = torch.tensor(0.0).cuda()
 
-        if iter_num % args.cls_dis_freq == 0 and args.cls_dis_weight > 0 and not args.cls_dis_c_update:
+        if iter_num % args.cls_dis_freq == 0 and args.cls_dis_weight != 0 and not args.cls_dis_c_update:
             if args.wa_on_cls_dis:
                 b = b1
                 c = outputs_test
@@ -566,7 +566,7 @@ def train_target(args):
         classifier_loss.backward()
         optimizer.step()
 
-        if iter_num % args.cls_dis_freq == 0 and args.cls_dis_weight > 0 and args.cls_dis_c_update:
+        if iter_num % args.cls_dis_freq == 0 and args.cls_dis_weight != 0 and args.cls_dis_c_update:
             if args.wa_on_cls_dis:
                 b1 = netB(netF(inputs_test3))
             else:
