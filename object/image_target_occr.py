@@ -334,6 +334,8 @@ def train_target(args):
 
         hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
+        iter_hc = iter(hc_loader)
+
     max_iter = args.max_epoch * len(dset_loaders["target"])
     interval_iter = max_iter // args.interval
     iter_num = 0
