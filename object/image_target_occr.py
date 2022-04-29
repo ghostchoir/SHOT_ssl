@@ -330,7 +330,7 @@ def train_target(args):
             dset_loaders["target"] = DataLoader(dset_loaders["target"].dataset, batch_size=args.batch_size,
                                                 shuffle=True, num_workers=args.worker, drop_last=True)
 
-        hc_set = ImageList_pl_update(txt_tar, p, idxs=hc_idxs)
+        hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], idxs=hc_idxs)
 
         hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, args.paws_batch_size, args.class_num, seed=args.seed)
 
