@@ -214,9 +214,9 @@ def train_target(args):
     modelpath = args.output_dir_src + '/source_C.pt'
     netC.load_state_dict(torch.load(modelpath), strict=False)
     cls_weights = copy.deepcopy(netC.fc.weight.data).numpy()
-    netC.eval()
-    for k, v in netC.named_parameters():
-        v.requires_grad = False
+    #netC.eval()
+    #for k, v in netC.named_parameters():
+    #    v.requires_grad = False
 
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
@@ -963,6 +963,8 @@ if __name__ == "__main__":
     parser.add_argument('--minent_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
     parser.add_argument('--cr_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
     parser.add_argument('--cls_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
+
+    parser.add_argument('--paws_pl_weight', type=float, default=0.0)
 
     parser.add_argument('--separate_wd', type=str2bool, default=False)
 

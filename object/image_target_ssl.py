@@ -213,8 +213,8 @@ def train_target(args):
     netC.load_state_dict(torch.load(modelpath), strict=False)
     cls_weights = copy.deepcopy(netC.fc.weight.data).numpy()
     #netC.eval()
-    for k, v in netC.named_parameters():
-        v.requires_grad = False
+    #for k, v in netC.named_parameters():
+    #    v.requires_grad = False
 
     if args.dataparallel:
         netF = nn.DataParallel(netF).cuda()
