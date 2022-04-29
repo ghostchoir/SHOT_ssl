@@ -301,7 +301,14 @@ def train_target(args):
         iter_memax = iter(dset_loaders["target"])
 
         while memax_iter < memax_max_iter:
-            inputs, labels, tar_idx = iter_memax.next()
+            iter_memax = iter(dset_loaders["target"])
+
+            while memax_iter < memax_max_iter:
+                try:
+                    inputs, labels, tar_idx = iter_memax.next()
+                except:
+                    iter_memax = iter(dset_loaders["target"])
+                    inputs, labels, tar_idx = iter_memax.next()
 
             if args.wa_to_memax:
                 inputs = inputs[2].cuda()
