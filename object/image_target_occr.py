@@ -327,6 +327,8 @@ def train_target(args):
 
         if args.exclude_lc:
             dset_loaders["target"].dataset.exclude(hc_idxs)
+            dset_loaders["target"] = DataLoader(dset_loaders["target"].dataset, batch_size=args.batch_size,
+                                                shuffle=True, num_workers=args.worker, drop_last=True)
 
         hc_set = ImageList_pl_update(txt_tar, p, idxs=hc_idxs)
 
