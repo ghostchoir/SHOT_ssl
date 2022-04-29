@@ -279,8 +279,7 @@ class ImageList_pl_update(Dataset):
             self.loader = l_loader
 
     def __getitem__(self, index):
-        true_idx = self.idxs.index(index)
-        path, target = self.images[true_idx], self.targets[true_idx]
+        path, target = self.images[index], self.targets[index]
         img = self.loader(path)
         if self.transform is not None:
             img = self.transform(img)
