@@ -330,7 +330,7 @@ def train_target(args):
             dset_loaders["target"] = DataLoader(dset_loaders["target"].dataset, batch_size=args.batch_size,
                                                 shuffle=True, num_workers=args.worker, drop_last=True)
 
-        hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], idxs=hc_idxs)
+        hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], transform=image_hc(args), idxs=hc_idxs)
 
         hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, args.paws_batch_size, args.class_num, seed=args.seed)
 
@@ -855,6 +855,7 @@ if __name__ == "__main__":
     parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug_pl', type=str, default='test', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug_hc', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--ra_n', type=int, default=1)
     parser.add_argument('--ra_m', type=int, default=10)
     parser.add_argument('--sg3', type=str2bool, default=False)

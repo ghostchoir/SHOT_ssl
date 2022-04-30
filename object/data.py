@@ -304,6 +304,11 @@ def image_pl(args):
     return transforms.Compose(trfs)
 
 
+def image_hc(args):
+    trfs = get_image_transform(args.aug_hc, args)
+    return transforms.Compose(trfs)
+
+
 def image_test(args, resize_size=256, crop_size=224, alexnet=False):
     if not alexnet:
         if args.norm_img_mode == 'whitening':
