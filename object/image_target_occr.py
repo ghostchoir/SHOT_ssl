@@ -498,12 +498,16 @@ def train_target(args):
             if iter_num < interval_iter * args.skip_multiplier and args.minent_scheduling == 'step':
                 im_loss *= 0
             classifier_loss += im_loss
+        else:
+            im_loss = torch.tensor(0.0).cuda()
 
         if args.gent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
             msoftmax = softmax_out.mean(dim=0)
             gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
             classifier_loss -= args.gent_par * gentropy_loss
+        else:
+            gentropy_loss = torch.tensor(0.0).cuda()
 
         if args.cr_weight > 0:
             try:
