@@ -173,7 +173,7 @@ def data_load(args):
             sampler = ClassStratifiedSampler(dsets["source_tr"], 1, 0, args.per_class_batch_size,
                                              args.class_num, args.seed)
             dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_sampler=sampler, num_workers=args.worker,
-                                                   drop_last=False if args.ssl_task == 'none' else True, pin_memory=)
+                                                   drop_last=False if args.ssl_task == 'none' else True, pin_memory=True)
         else:
             dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True,
                                                    num_workers=args.worker,
@@ -759,7 +759,8 @@ if __name__ == "__main__":
     parser.add_argument('--ent_weight', type=float, default=0)
     parser.add_argument('--gent_weight', type=float, default=1.0)
 
-    parser.add_argument('--class-stratified', type=str2bool, default=False)
+    parser.add_argument('--class_stratified', type=str2bool, default=False)
+    parser.add_argument('--per_class_batch_size', type=int, default=6)
 
     args = parser.parse_args()
 
