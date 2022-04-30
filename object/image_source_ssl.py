@@ -167,9 +167,17 @@ def data_load(args):
         min_dist = min(cls_dist_inv)
         cls_dist_inv_norm = [p / min_dist for p in cls_dist_inv]
         args.ce_weight = cls_dist_inv_norm
-        dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True,
-                                               num_workers=args.worker,
-                                               drop_last=False if args.ssl_task == 'none' else True)
+
+        if args.class_stratified:
+            from paws import ClassStratifiedSampler
+            sampler = ClassStratifiedSampler(dsets["source_tr"], 1, 0, args.per_class_batch_size,
+                                             args.class_num, args.seed)
+            dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_sampler=sampler, num_workers=args.worker,
+                                                   drop_last=False if args.ssl_task == 'none' else True, pin_memory=)
+        else:
+            dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_size=train_bs, shuffle=True,
+                                                   num_workers=args.worker,
+                                                   drop_last=False if args.ssl_task == 'none' else True)
         dsets["source_te"] = ImageList(te_txt, transform=image_test(args))
         dset_loaders["source_te"] = DataLoader(dsets["source_te"], batch_size=train_bs, shuffle=False,
                                                num_workers=args.worker, drop_last=False)
@@ -750,6 +758,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--ent_weight', type=float, default=0)
     parser.add_argument('--gent_weight', type=float, default=1.0)
+
+    parser.add_argument('--class-stratified', type=str2bool, default=False)
 
     args = parser.parse_args()
 
