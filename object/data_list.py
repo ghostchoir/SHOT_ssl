@@ -168,7 +168,7 @@ class ImageList_rotation(ImageList):
 
 
 class ImageList_update(Dataset):
-    def __init__(self, image_list, labels=None, transform=None, target_transform=None, mode='RGB', idxs=None):
+    def __init__(self, image_list, labels=None, transform=None, target_transform=None, mode='RGB', idxs=None, return_idx=False):
         imgs = make_dataset(image_list, labels)
         if len(imgs) == 0:
             raise (RuntimeError("Found 0 images in subfolders of: " + root + "\n"
@@ -202,6 +202,7 @@ class ImageList_update(Dataset):
             self.loader = rgb_loader
         elif mode == 'L':
             self.loader = l_loader
+        self.return_idx = return_idx
 
     def __getitem__(self, index):
         path, target = self.images[index], self.targets[index]
@@ -211,7 +212,10 @@ class ImageList_update(Dataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target, index
+        if self.return_idx:
+            return img, target, index
+        else:
+            return img, target
 
     def __len__(self):
         return len(self.images)
