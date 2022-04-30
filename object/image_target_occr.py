@@ -114,7 +114,7 @@ def data_load(args):
             txt_tar = new_tar.copy()
             txt_test = txt_tar.copy()
 
-        dsets["target"] = ImageList_update(txt_tar, transform=image_train(args))
+        dsets["target"] = ImageList_update(txt_tar, transform=image_train(args), return_idx=True)
         dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker,
                                             drop_last=True)
 
