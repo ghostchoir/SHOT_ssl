@@ -10,7 +10,7 @@ import torch.optim as optim
 from torchvision import transforms, datasets
 import network, loss
 from torch.utils.data import DataLoader
-from data_list import ImageList
+from data_list import ImageList, ImageList_update
 from data import *
 import random, pdb, math, copy
 from tqdm import tqdm
@@ -170,6 +170,7 @@ def data_load(args):
 
         if args.class_stratified:
             from paws import ClassStratifiedSampler
+            dsets["source_tr"] = ImageList_update(tr_txt, transform=image_train(args))
             sampler = ClassStratifiedSampler(dsets["source_tr"], 1, 0, args.per_class_batch_size,
                                              args.class_num, args.seed)
             dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_sampler=sampler, num_workers=args.worker,
