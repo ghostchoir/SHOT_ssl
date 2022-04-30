@@ -459,7 +459,7 @@ def train_target(args):
                 iter_hc = iter(hc_loader)
                 inputs_hc, labels_hc, _ = iter_hc.next()
 
-            inputs_hc = inputs_hc[0].cuda()
+            inputs_hc = inputs_hc.cuda()
             b_hc = netB(netF(inputs_hc))
             labels_hc = labels_hc.cuda()
             labels_hc_onehot = F.one_hot(labels_hc, num_classes=args.class_num) \
