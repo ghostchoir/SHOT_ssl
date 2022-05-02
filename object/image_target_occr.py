@@ -320,7 +320,6 @@ def train_target(args):
 
     max_iter = args.max_epoch * len(dset_loaders["target"])
     backup_dset = copy.deepcopy(dset_loaders["target"].dataset)
-    iter_test = iter(dset_loaders["target"])
     interval_iter = max_iter // args.interval
     iter_num = 0
 
@@ -340,9 +339,9 @@ def train_target(args):
             hc_idxs = get_topk_conf_indices(c, p, n_classes=args.class_num, k=args.hc_topk, threshold=args.hc_threshold)
 
             if args.exclude_lc:
-                dset_loaders["target"].dataset = copy.deepcopy(backup_dset)
-                dset_loaders["target"].dataset.exclude(hc_idxs)
-                dset_loaders["target"] = DataLoader(dset_loaders["target"].dataset, batch_size=args.batch_size,
+                tgt_dataset = copy.deepcopy(backup_dset)
+                tgt_dataset.exclude(hc_idxs)
+                dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size,
                                                     shuffle=True, num_workers=args.worker, drop_last=True)
                 max_iter = args.max_epoch * len(dset_loaders["target"])
                 interval_iter = max_iter // args.interval
