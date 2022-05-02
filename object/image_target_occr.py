@@ -318,37 +318,62 @@ def train_target(args):
         optimizer = optim.SGD(param_group)
         optimizer = op_copy(optimizer)
 
-    if args.paws_weight > 0:
-        netF.eval()
-        netH.eval()
-        netB.eval()
-
-        if args.sa_to_calib:
-            c, p, f = get_outputs(dset_loaders['pl_sa'], netF, netH, netB, netC)
-        else:
-            c, p, f = get_outputs(dset_loaders['pl'], netF, netH, netB, netC)
-        hc_idxs = get_topk_conf_indices(c, p, n_classes=args.class_num, k=args.hc_topk, threshold=args.hc_threshold)
-
-        if args.exclude_lc:
-            dset_loaders["target"].dataset.exclude(hc_idxs)
-            dset_loaders["target"] = DataLoader(dset_loaders["target"].dataset, batch_size=args.batch_size,
-                                                shuffle=True, num_workers=args.worker, drop_last=True)
-
-        hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], transform=image_hc(args), idxs=hc_idxs)
-
-        hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, args.paws_batch_size, args.class_num, seed=args.seed)
-
-        hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
-
-        iter_hc = iter(hc_loader)
-
     max_iter = args.max_epoch * len(dset_loaders["target"])
+    backup_dset = copy.deepcopy(dset_loaders["target"].dataset)
     interval_iter = max_iter // args.interval
     iter_num = 0
 
     mem_label = None
 
     while iter_num < max_iter:
+
+        if iter_num % interval_iter == 0 and args.paws_weight > 0:
+            netF.eval()
+            netH.eval()
+            netB.eval()
+
+            if args.sa_to_calib:
+                c, p, f = get_outputs(dset_loaders['pl_sa'], netF, netH, netB, netC)
+            else:
+                c, p, f = get_outputs(dset_loaders['pl'], netF, netH, netB, netC)
+            hc_idxs = get_topk_conf_indices(c, p, n_classes=args.class_num, k=args.hc_topk, threshold=args.hc_threshold)
+
+            if args.exclude_lc:
+                dset_loaders["target"].dataset = copy.deepcopy(backup_dset)
+                dset_loaders["target"].dataset.exclude(hc_idxs)
+                dset_loaders["target"] = DataLoader(dset_loaders["target"].dataset, batch_size=args.batch_size,
+                                                    shuffle=True, num_workers=args.worker, drop_last=True)
+                max_iter = args.max_epoch * len(dset_loaders["target"])
+                interval_iter = max_iter // args.interval
+
+            hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], transform=image_hc(args), idxs=hc_idxs)
+
+            hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, args.paws_batch_size, args.class_num, seed=args.seed)
+
+            hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
+
+            iter_hc = iter(hc_loader)
+
+            netF.train()
+            netH.train()
+            netB.train()
+
+        if iter_num % interval_iter == 0 and args.cls_par > 0:
+            netF.eval()
+            netH.eval()
+            netB.eval()
+            if args.eval_off_once:
+                eval_off = iter_num == 0
+            else:
+                eval_off = True
+            mem_label, mem_conf, centroids, labelset, pred = obtain_label(dset_loaders['pl'], netF, netH, netB, netC,
+                                                                          args, mem_label, eval_off)
+            mem_label = torch.from_numpy(mem_label).cuda()
+
+            netF.train()
+            netH.train()
+            netB.train()
+
         try:
             inputs_test, labels_test, tar_idx = iter_test.next()
         except:
@@ -361,22 +386,6 @@ def train_target(args):
         except:
             if inputs_test[0].size(0) == 1:
                 continue
-
-        if iter_num % interval_iter == 0 and args.cls_par > 0:
-            netF.eval()
-            netH.eval()
-            netB.eval()
-            if args.eval_off_once:
-                eval_off = iter_num == 0
-            else:
-                eval_off = True
-            mem_label, mem_conf, centroids, labelset = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args,
-                                                                    mem_label, eval_off)
-            mem_label = torch.from_numpy(mem_label).cuda()
-
-            netF.train()
-            netH.train()
-            netB.train()
 
         inputs_test1 = None
         inputs_test2 = None
@@ -624,6 +633,7 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
                 labels_forward = None
 
             outputs = netC(feas, labels_forward)
+            raw_preds = torch.argmax(outputs, dim=1)
 
             if start_test:
                 all_fea = feas.float().cpu()
@@ -737,9 +747,9 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
             netC.fc.weight.data = m * netC.fc.weight.data + (1 - m) * torch.from_numpy(centroids).float().to(device)
 
     try:
-        return pred_label.astype('int'), conf.cpu().numpy(), centroids, labelset
+        return pred_label.astype('int'), conf.cpu().numpy(), centroids, labelset, predict
     except:
-        return pred_label.astype('int'), conf, centroids, labelset
+        return pred_label.astype('int'), conf, centroids, labelset, predict
 
 
 def calibrate_bn_stats(loader, netF, netB, args):
