@@ -320,6 +320,7 @@ def train_target(args):
 
     max_iter = args.max_epoch * len(dset_loaders["target"])
     backup_dset = copy.deepcopy(dset_loaders["target"].dataset)
+    iter_test = iter(dset_loaders["target"])
     interval_iter = max_iter // args.interval
     iter_num = 0
 
