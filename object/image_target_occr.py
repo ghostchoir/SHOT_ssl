@@ -321,13 +321,14 @@ def train_target(args):
     max_iter = args.max_epoch * len(dset_loaders["target"])
     backup_dset = copy.deepcopy(dset_loaders["target"].dataset)
     interval_iter = max_iter // args.interval
+    hc_interval_iter = max_iter // args.hc_interval
     iter_num = 0
 
     mem_label = None
 
     while iter_num < max_iter:
 
-        if iter_num % interval_iter == 0 and args.paws_weight > 0:
+        if iter_num % hc_interval_iter == 0 and args.paws_weight > 0:
             netF.eval()
             netH.eval()
             netB.eval()
@@ -493,9 +494,11 @@ def train_target(args):
 
             paws_loss = paws(paws_p1, paws_p2)
 
-            paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
+            classifier_loss += args.paws_weight * paws_loss
 
-            classifier_loss += args.paws_weight * (paws_loss + paws_cls)
+            if args.paws_cls_weight != 0:
+                paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
+                classifier_loss += args.paws_weight * paws_cls
 
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
@@ -794,6 +797,7 @@ if __name__ == "__main__":
     parser.add_argument('--t', type=int, default=1, help="target")
     parser.add_argument('--max_epoch', type=int, default=15, help="max iterations")
     parser.add_argument('--interval', type=int, default=15)
+    parser.add_argument('--hc_interval', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
     parser.add_argument('--eval_batch_mult', type=int, default=8)
     parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
@@ -848,6 +852,7 @@ if __name__ == "__main__":
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--paws_weight', type=float, default=0.0)
+    parser.add_argument('--paws_cls_weight', type=float, default=0.0)
     parser.add_argument('--initial_memax', type=int, default=100)
     parser.add_argument('--wa_to_memax', type=str2bool, default=True)
     parser.add_argument('--memax_print_freq', type=int, default=10)
