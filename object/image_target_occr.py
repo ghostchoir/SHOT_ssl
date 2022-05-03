@@ -355,6 +355,8 @@ def train_target(args):
 
             iter_hc = iter(hc_loader)
 
+            args.hc_threshold = min(args.hc_threshold + args.hc_threshold_increase, args.hc_threshold_max)
+
             netF.train()
             netH.train()
             netB.train()
@@ -947,6 +949,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--sa_to_calib', type=str2bool, default=True)
     parser.add_argument('--exclude_lc', type=str2bool, default=True)
+    parser.add_argument('--hc_threshold_increase', type=float, default=0.0)
+    parser.add_argument('--hc_threshold_max', type=float, default=0.9)
 
     args = parser.parse_args()
 
