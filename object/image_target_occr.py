@@ -944,7 +944,7 @@ if __name__ == "__main__":
     parser.add_argument('--separate_wd', type=str2bool, default=False)
 
     parser.add_argument('--sa_to_calib', type=str2bool, default=True)
-    parser.add_argument('--exclude-lc', type=str2bool, default=True)
+    parser.add_argument('--exclude_lc', type=str2bool, default=True)
 
     args = parser.parse_args()
 
