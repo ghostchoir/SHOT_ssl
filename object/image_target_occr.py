@@ -499,6 +499,8 @@ def train_target(args):
             if args.paws_cls_weight != 0:
                 paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
                 classifier_loss += args.paws_weight * paws_cls
+            else:
+                paws_cls = torch.tensor(0.0).cuda()
 
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
