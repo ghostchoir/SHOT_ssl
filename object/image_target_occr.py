@@ -274,7 +274,7 @@ def train_target(args):
     else:
         cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)
 
-    if args.cr_weight > 0:
+    if args.cr_weight != 0 or args.paws_cr_weight != 0:
         if args.cr_metric == 'cos':
             dist = nn.CosineSimilarity(dim=1).cuda()
         elif args.cr_metric == 'l1':
@@ -504,6 +504,12 @@ def train_target(args):
             else:
                 paws_cls = torch.tensor(0.0).cuda()
 
+            if args.paws_cr_weight != 0:
+                paws_cr = dist(outputs_test, paws_p1)
+                classifier_loss += args.paws_cr_weight * paws_cr
+            else:
+                paws_cr = torch.tensor(0.0).cuda()
+
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
             entropy_loss = torch.mean(loss.Entropy(softmax_out))
@@ -556,8 +562,9 @@ def train_target(args):
             netH.eval()
             netB.eval()
             print(len(hc_set.idxs), 'samples are in HC set')
-            print('PAWS: {:.3f} CLS: {:.3f} Ent: {:.3f} ME: {:.3f}'.format(paws_loss.item(), paws_cls.item(),
-                                                                           im_loss.item(), gentropy_loss.item()))
+            print('PAWS: {:.3f} CLS: {:.3f} CR: {:.3f} Ent: {:.3f} ME: {:.3f}'.format(paws_loss.item(), paws_cls.item(),
+                                                                                      paws_cr.item(), im_loss.item(),
+                                                                                      gentropy_loss.item()))
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter,
@@ -857,6 +864,7 @@ if __name__ == "__main__":
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--paws_weight', type=float, default=0.0)
     parser.add_argument('--paws_cls_weight', type=float, default=0.0)
+    parser.add_argument('--paws_cr_weight', type=float, default=0.0)
     parser.add_argument('--initial_memax', type=int, default=100)
     parser.add_argument('--wa_to_memax', type=str2bool, default=True)
     parser.add_argument('--memax_print_freq', type=int, default=10)
