@@ -274,7 +274,7 @@ def train_target(args):
     else:
         cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)
 
-    if args.cr_weight > 0:
+    if args.cr_weight != 0 or args.paws_cr_weight != 0:
         if args.cr_metric == 'cos':
             dist = nn.CosineSimilarity(dim=1).cuda()
         elif args.cr_metric == 'l1':
@@ -321,13 +321,14 @@ def train_target(args):
     max_iter = args.max_epoch * len(dset_loaders["target"])
     backup_dset = copy.deepcopy(dset_loaders["target"].dataset)
     interval_iter = max_iter // args.interval
+    hc_interval_iter = max_iter // args.hc_interval
     iter_num = 0
 
     mem_label = None
 
     while iter_num < max_iter:
 
-        if iter_num % interval_iter == 0 and args.paws_weight > 0:
+        if iter_num % hc_interval_iter == 0 and args.paws_weight > 0:
             netF.eval()
             netH.eval()
             netB.eval()
@@ -353,6 +354,8 @@ def train_target(args):
             hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
             iter_hc = iter(hc_loader)
+
+            args.hc_threshold = min(args.hc_threshold + args.hc_threshold_increase, args.hc_threshold_max)
 
             netF.train()
             netH.train()
@@ -493,9 +496,19 @@ def train_target(args):
 
             paws_loss = paws(paws_p1, paws_p2)
 
-            paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
+            classifier_loss += args.paws_weight * paws_loss
 
-            classifier_loss += args.paws_weight * (paws_loss + paws_cls)
+            if args.paws_cls_weight != 0:
+                paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
+                classifier_loss += args.paws_weight * paws_cls
+            else:
+                paws_cls = torch.tensor(0.0).cuda()
+
+            if args.paws_cr_weight != 0:
+                paws_cr = dist(outputs_test, paws_p1)
+                classifier_loss += args.paws_cr_weight * paws_cr
+            else:
+                paws_cr = torch.tensor(0.0).cuda()
 
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
@@ -549,8 +562,9 @@ def train_target(args):
             netH.eval()
             netB.eval()
             print(len(hc_set.idxs), 'samples are in HC set')
-            print('PAWS: {:.3f} CLS: {:.3f} Ent: {:.3f} ME: {:.3f}'.format(paws_loss.item(), paws_cls.item(),
-                                                                           im_loss.item(), gentropy_loss.item()))
+            print('PAWS: {:.3f} CLS: {:.3f} CR: {:.3f} Ent: {:.3f} ME: {:.3f}'.format(paws_loss.item(), paws_cls.item(),
+                                                                                      paws_cr.item(), im_loss.item(),
+                                                                                      gentropy_loss.item()))
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter,
@@ -794,6 +808,7 @@ if __name__ == "__main__":
     parser.add_argument('--t', type=int, default=1, help="target")
     parser.add_argument('--max_epoch', type=int, default=15, help="max iterations")
     parser.add_argument('--interval', type=int, default=15)
+    parser.add_argument('--hc_interval', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
     parser.add_argument('--eval_batch_mult', type=int, default=8)
     parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
@@ -848,6 +863,8 @@ if __name__ == "__main__":
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--paws_weight', type=float, default=0.0)
+    parser.add_argument('--paws_cls_weight', type=float, default=0.0)
+    parser.add_argument('--paws_cr_weight', type=float, default=0.0)
     parser.add_argument('--initial_memax', type=int, default=100)
     parser.add_argument('--wa_to_memax', type=str2bool, default=True)
     parser.add_argument('--memax_print_freq', type=int, default=10)
@@ -939,7 +956,9 @@ if __name__ == "__main__":
     parser.add_argument('--separate_wd', type=str2bool, default=False)
 
     parser.add_argument('--sa_to_calib', type=str2bool, default=True)
-    parser.add_argument('--exclude-lc', type=str2bool, default=True)
+    parser.add_argument('--exclude_lc', type=str2bool, default=True)
+    parser.add_argument('--hc_threshold_increase', type=float, default=0.0)
+    parser.add_argument('--hc_threshold_max', type=float, default=0.9)
 
     args = parser.parse_args()
 
