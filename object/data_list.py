@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import random
+import copy
 from PIL import Image
 from torchvision import datasets
 from torch.utils.data import Dataset
@@ -264,7 +265,7 @@ class ImageList_pl_update(Dataset):
 
         self.imgs = imgs
         self.images = []
-        self.targets = pls
+        self.targets = copy.deepcopy(pls)
         for idx in self.idxs:
             self.images.append(self.imgs[idx][0])
         self.classes = np.unique(self.targets)
