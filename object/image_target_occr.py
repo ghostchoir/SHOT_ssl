@@ -129,7 +129,7 @@ def data_load(args):
         args.aug_pl = prev_aug_pl
         dsets["pl_sa"] = ImageList_idx(txt_test, transform=pl_sa)
 
-        dset_loaders["pl_sa"] = DataLoader(dsets["pl"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
+        dset_loaders["pl_sa"] = DataLoader(dsets["pl_sa"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                            num_workers=args.worker, drop_last=False)
 
         dsets["test"] = ImageList_idx(txt_test, transform=image_test(args))
@@ -328,7 +328,8 @@ def train_target(args):
 
     while iter_num < max_iter:
 
-        if iter_num % hc_interval_iter == 0 and args.paws_weight > 0:
+        if iter_num % hc_interval_iter == 0 and (
+                args.paws_weight != 0 or args.paws_cr_weight != 0 or args.paws_cls_weight != 0):
             netF.eval()
             netH.eval()
             netB.eval()
@@ -468,7 +469,9 @@ def train_target(args):
         else:
             classifier_loss = torch.tensor(0.0).cuda()
 
-        if args.paws_weight > 0:
+        pl_loss = classifier_loss.item()
+
+        if args.paws_weight != 0 or args.paws_cr_weight != 0 or args.paws_cls_weight != 0:
             try:
                 inputs_hc, labels_hc, _ = iter_hc.next()
             except:
@@ -485,18 +488,18 @@ def train_target(args):
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
             paws_p1 = snn(b3, b_hc, labels_hc_onehot)
 
-            if args.paws_detach:
-                b1_detach = b1.clone().detach()
-                b_hc_detach = b_hc.clone().detach()
+            if args.paws_weight != 0:
+                if args.paws_detach:
+                    b1_detach = b1.clone().detach()
+                    b_hc_detach = b_hc.clone().detach()
+                else:
+                    b1_detach = b1
+                    b_hc_detach = b_hc
+                paws_p2 = snn(b1_detach, b_hc_detach, labels_hc_onehot)
+                paws_loss = paws(paws_p1, paws_p2)
+                classifier_loss += args.paws_weight * paws_loss
             else:
-                b1_detach = b1
-                b_hc_detach = b_hc
-
-            paws_p2 = snn(b1_detach, b_hc_detach, labels_hc_onehot)
-
-            paws_loss = paws(paws_p1, paws_p2)
-
-            classifier_loss += args.paws_weight * paws_loss
+                paws_loss = torch.tensor(0.0).cuda()
 
             if args.paws_cls_weight != 0:
                 paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
@@ -562,9 +565,12 @@ def train_target(args):
             netH.eval()
             netB.eval()
             print(len(hc_set.idxs), 'samples are in HC set')
-            print('PAWS: {:.3f} CLS: {:.3f} CR: {:.3f} Ent: {:.3f} ME: {:.3f}'.format(paws_loss.item(), paws_cls.item(),
-                                                                                      paws_cr.item(), im_loss.item(),
-                                                                                      gentropy_loss.item()))
+            print('KMEANS: {:.3f} PAWS: {:.3f} CLS: {:.3f} CR: {:.3f} Ent: {:.3f} ME: {:.3f}'.format(pl_loss,
+                                                                                                     paws_loss.item(),
+                                                                                                     paws_cls.item(),
+                                                                                                     paws_cr.item(),
+                                                                                                     im_loss.item(),
+                                                                                                     gentropy_loss.item()))
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter,
