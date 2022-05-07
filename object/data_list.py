@@ -229,7 +229,7 @@ class ImageList_update(Dataset):
                 if idx not in self.idxs:
                     self.idxs.append(idx)
                     self.images.append(self.imgs[idx][0])
-                    self.targets.append(self.targets[idx][0])
+                    self.targets.append(self.imgs[idx][1])
                 #success += 1
             except:
                 pass
