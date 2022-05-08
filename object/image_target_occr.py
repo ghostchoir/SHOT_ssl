@@ -322,6 +322,12 @@ def train_target(args):
     gt_labels = np.array(copy.deepcopy(dset_loaders["target"].dataset.targets))
     iter_num = 0
 
+    if args.paws_cls_weight != 0:
+        if args.paws_cls_smooth == 0:
+            paws_cls_fn = nn.CrossEntropyLoss()
+        else:
+            paws_cls_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.paws_cls_smooth)
+
     mem_label = None
 
     while iter_num < max_iter:
@@ -516,7 +522,16 @@ def train_target(args):
                 paws_loss = torch.tensor(0.0).cuda()
 
             if args.paws_cls_weight != 0:
-                paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
+                if args.soft_paws_cls:
+                    if args.paws_cls_detach:
+                        paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1.detach(), reduction='mean')
+                    else:
+                        paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
+                else:
+                    _, paws_pl = torch.max(paws_p1.detach())
+                    paws_pl_onehot = F.one_hot(paws_pl, num_classes=args.class_num)
+                    paws_cls = paws_cls_fn(outputs_test, paws_pl_onehot)
+
                 classifier_loss += args.paws_weight * paws_cls
             else:
                 paws_cls = torch.tensor(0.0).cuda()
@@ -986,6 +1001,9 @@ if __name__ == "__main__":
     parser.add_argument('--exclude_lc', type=str2bool, default=True)
     parser.add_argument('--hc_threshold_increase', type=float, default=0.0)
     parser.add_argument('--hc_threshold_max', type=float, default=0.9)
+    parser.add_argument('--soft_paws_cls', type=str2bool, default=True)
+    parser.add_argument('--paws_cls_detach', type=str2bool, default=False)
+    parser.add_argument('--paws_cls_smooth', type=float, default=0.1)
 
     parser.add_argument('--sspl_agreement', type=str2bool, default=False)
 
