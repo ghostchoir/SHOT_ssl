@@ -987,6 +987,8 @@ if __name__ == "__main__":
     parser.add_argument('--hc_threshold_increase', type=float, default=0.0)
     parser.add_argument('--hc_threshold_max', type=float, default=0.9)
 
+    parser.add_argument('--sspl_agreement', type=str2bool, default=False)
+
     args = parser.parse_args()
 
     args.pretrained = not args.nopretrained
