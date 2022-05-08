@@ -105,6 +105,7 @@ def get_outputs(loader, netF, netH, netB, netC):
     confs = []
     preds = []
     features = []
+    outs = []
     netF.eval()
     netH.eval()
     netB.eval()
@@ -116,6 +117,7 @@ def get_outputs(loader, netF, netH, netB, netC):
             feats = netB(netF(inputs))
 
             outputs = netC(feats, None)
+            outs += outputs.tolist()
             outputs = nn.Softmax(dim=1)(outputs / 1.0)
             conf, predict = torch.max(outputs, 1)
 
@@ -123,7 +125,7 @@ def get_outputs(loader, netF, netH, netB, netC):
             preds += predict.tolist()
             features += feats.tolist()
 
-    return np.asarray(confs), np.asarray(preds), np.asarray(features)
+    return np.asarray(confs), np.asarray(preds), np.asarray(features), np.asarray(outs)
 
 
 class ClassStratifiedSampler(torch.utils.data.Sampler):

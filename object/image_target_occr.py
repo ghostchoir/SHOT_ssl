@@ -123,14 +123,10 @@ def data_load(args):
         dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                         num_workers=args.worker, drop_last=False)
 
-        prev_aug_pl = args.aug_pl
-        args.aug_pl = 'simclr'
-        pl_sa = image_pl(args)
-        args.aug_pl = prev_aug_pl
-        dsets["pl_sa"] = ImageList_idx(txt_test, transform=pl_sa)
+        dsets["cal"] = ImageList_idx(txt_test, transform=image_cal(args))
 
-        dset_loaders["pl_sa"] = DataLoader(dsets["pl_sa"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
-                                           num_workers=args.worker, drop_last=False)
+        dset_loaders["cal"] = DataLoader(dsets["cal"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
+                                         num_workers=args.worker, drop_last=False)
 
         dsets["test"] = ImageList_idx(txt_test, transform=image_test(args))
         dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
@@ -320,28 +316,27 @@ def train_target(args):
 
     max_iter = args.max_epoch * len(dset_loaders["target"])
     backup_dset = copy.deepcopy(dset_loaders["target"].dataset)
+    use_hc = (args.paws_weight != 0 or args.paws_cr_weight != 0 or args.paws_cls_weight != 0)
     interval_iter = max_iter // args.interval
     hc_interval_iter = max_iter // args.hc_interval
+    gt_labels = np.array(copy.deepcopy(dset_loaders["target"].dataset.targets))
     iter_num = 0
 
     mem_label = None
 
     while iter_num < max_iter:
 
-        if iter_num % hc_interval_iter == 0 and (
-                args.paws_weight != 0 or args.paws_cr_weight != 0 or args.paws_cls_weight != 0):
+        if iter_num % hc_interval_iter == 0 and use_hc:
             netF.eval()
             netH.eval()
             netB.eval()
 
-            if args.sa_to_calib:
-                c, p, f = get_outputs(dset_loaders['pl_sa'], netF, netH, netB, netC)
-            else:
-                c, p, f = get_outputs(dset_loaders['pl'], netF, netH, netB, netC)
+            c, p, f, o = get_outputs(dset_loaders['cal'], netF, netH, netB, netC)
             hc_idxs = get_topk_conf_indices(c, p, n_classes=args.class_num, k=args.hc_topk, threshold=args.hc_threshold)
-
+            min_conf = np.min(p[hc_idxs])
             if args.exclude_lc:
-                tgt_dataset = copy.deepcopy(backup_dset)
+                if args.reset_lc:
+                    tgt_dataset = copy.deepcopy(backup_dset)
                 tgt_dataset.exclude(hc_idxs)
                 dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size,
                                                     shuffle=True, num_workers=args.worker, drop_last=True)
@@ -362,7 +357,7 @@ def train_target(args):
             netH.train()
             netB.train()
 
-        if iter_num % interval_iter == 0 and args.cls_par > 0:
+        if iter_num % interval_iter == 0 and (args.sspl_agreement or args.cls_par > 0):
             netF.eval()
             netH.eval()
             netB.eval()
@@ -370,13 +365,32 @@ def train_target(args):
                 eval_off = iter_num == 0
             else:
                 eval_off = True
-            mem_label, mem_conf, centroids, labelset, pred = obtain_label(dset_loaders['pl'], netF, netH, netB, netC,
-                                                                          args, mem_label, eval_off)
-            mem_label = torch.from_numpy(mem_label).cuda()
+            if args.aug_pl == args.aug_cal:
+                pl, mem_conf, centroids, labelset, pred = obtain_label(dset_loaders['pl'], netF, netH, netB, netC,
+                                                                       args, mem_label, eval_off, f, o, gt_labels)
+            else:
+                pl, mem_conf, centroids, labelset, pred = obtain_label(dset_loaders['pl'], netF, netH, netB, netC,
+                                                                       args, mem_label, eval_off)
+            mem_label = torch.from_numpy(pl).cuda()
 
             netF.train()
             netH.train()
             netB.train()
+
+            if use_hc and args.sspl_agreement:
+                agree_idxs = np.where(pl == pred)[0]
+                hc_set.include(pl[agree_idxs], agree_idxs)
+                hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, args.paws_batch_size, args.class_num, seed=args.seed)
+
+                hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
+
+                iter_hc = iter(hc_loader)
+                if args.exclude_lc:
+                    tgt_dataset.exclude(agree_idxs)
+                    dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size,
+                                                        shuffle=True, num_workers=args.worker, drop_last=True)
+                    max_iter = args.max_epoch * len(dset_loaders["target"])
+                    interval_iter = max_iter // args.interval
 
         try:
             inputs_test, labels_test, tar_idx = iter_test.next()
@@ -471,7 +485,7 @@ def train_target(args):
 
         pl_loss = classifier_loss.item()
 
-        if args.paws_weight != 0 or args.paws_cr_weight != 0 or args.paws_cls_weight != 0:
+        if use_hc:
             try:
                 inputs_hc, labels_hc, _ = iter_hc.next()
             except:
@@ -629,41 +643,47 @@ def obtain_bn_stats(loader, netF, netB, args):
     return mean, var
 
 
-def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False):
+def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False, f=None, o=None, l=None):
     if args.pl_eval_off_f and eval_off:
         netF.train()
     if args.pl_eval_off_b and eval_off:
         netB.train()
-    start_test = True
-    with torch.no_grad():
-        iter_test = iter(loader)
-        for _ in range(len(loader)):
-            data = iter_test.next()
 
-            inputs = data[0]
-            labels = data[1]
-            tar_idx = data[2]
-            inputs = inputs.cuda()
-            feas = netB(netF(inputs))
+    if f is not None:
+        all_fea = torch.from_numpy(f)
+        all_output = torch.from_numpy(o)
+        all_label = torch.from_numpy(l)
+    else:
+        start_test = True
+        with torch.no_grad():
+            iter_test = iter(loader)
+            for _ in range(len(loader)):
+                data = iter_test.next()
 
-            if (mem_label is not None) and (
-                    args.layer in ['add_margin', 'arc_margin', 'sphere']) and args.use_margin_pl:
-                labels_forward = mem_label[tar_idx]
-            else:
-                labels_forward = None
+                inputs = data[0]
+                labels = data[1]
+                tar_idx = data[2]
+                inputs = inputs.cuda()
+                feas = netB(netF(inputs))
 
-            outputs = netC(feas, labels_forward)
-            raw_preds = torch.argmax(outputs, dim=1)
+                if (mem_label is not None) and (
+                        args.layer in ['add_margin', 'arc_margin', 'sphere']) and args.use_margin_pl:
+                    labels_forward = mem_label[tar_idx]
+                else:
+                    labels_forward = None
 
-            if start_test:
-                all_fea = feas.float().cpu()
-                all_output = outputs.float().cpu()
-                all_label = labels.float()
-                start_test = False
-            else:
-                all_fea = torch.cat((all_fea, feas.float().cpu()), 0)
-                all_output = torch.cat((all_output, outputs.float().cpu()), 0)
-                all_label = torch.cat((all_label, labels.float()), 0)
+                outputs = netC(feas, labels_forward)
+                raw_preds = torch.argmax(outputs, dim=1)
+
+                if start_test:
+                    all_fea = feas.float().cpu()
+                    all_output = outputs.float().cpu()
+                    all_label = labels.float()
+                    start_test = False
+                else:
+                    all_fea = torch.cat((all_fea, feas.float().cpu()), 0)
+                    all_output = torch.cat((all_output, outputs.float().cpu()), 0)
+                    all_label = torch.cat((all_label, labels.float()), 0)
 
     if args.pl_type == 'naive':
         all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
@@ -896,6 +916,7 @@ if __name__ == "__main__":
     parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug_pl', type=str, default='test', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug_cal', type=str, default='test', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug_hc', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--ra_n', type=int, default=1)
     parser.add_argument('--ra_m', type=int, default=10)
@@ -961,7 +982,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--separate_wd', type=str2bool, default=False)
 
-    parser.add_argument('--sa_to_calib', type=str2bool, default=True)
+    parser.add_argument('--reset_lc', type=str2bool, default=True)
     parser.add_argument('--exclude_lc', type=str2bool, default=True)
     parser.add_argument('--hc_threshold_increase', type=float, default=0.0)
     parser.add_argument('--hc_threshold_max', type=float, default=0.9)
