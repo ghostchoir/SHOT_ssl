@@ -533,8 +533,7 @@ def train_target(args):
                         paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
                 else:
                     _, paws_pl = torch.max(paws_p1.detach(), dim=1)
-                    paws_pl_onehot = F.one_hot(paws_pl, num_classes=args.class_num)
-                    paws_cls = paws_cls_fn(outputs_test, paws_pl_onehot)
+                    paws_cls = paws_cls_fn(outputs_test, paws_pl)
 
                 classifier_loss += args.paws_weight * paws_cls
             else:
