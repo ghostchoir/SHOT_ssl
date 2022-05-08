@@ -384,19 +384,23 @@ def train_target(args):
             netB.train()
 
             if use_hc and args.sspl_agreement:
-                agree_idxs = np.where(pl == pred)[0]
-                hc_set.include(pl[agree_idxs], agree_idxs)
+                agree_idxs = np.where(pl == p)[0]
+                hc_idxs = np.where(c >= args.hc_threshold)[0]
+                filter_idxs = np.intersect1d(agree_idxs, hc_idxs)
+                print(len(filter_idxs))
+                hc_set.include(pl[filter_idxs], filter_idxs)
                 hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, args.paws_batch_size, args.class_num, seed=args.seed)
 
                 hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
                 iter_hc = iter(hc_loader)
                 if args.exclude_lc:
-                    tgt_dataset.exclude(agree_idxs)
+                    tgt_dataset.exclude(filter_idxs)
                     dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size,
                                                         shuffle=True, num_workers=args.worker, drop_last=True)
                     max_iter = args.max_epoch * len(dset_loaders["target"])
                     interval_iter = max_iter // args.interval
+                print(len(hc_set), len(tgt_dataset))
 
         try:
             inputs_test, labels_test, tar_idx = iter_test.next()
