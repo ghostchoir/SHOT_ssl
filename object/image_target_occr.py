@@ -385,7 +385,7 @@ def train_target(args):
 
             if use_hc and args.sspl_agreement:
                 agree_idxs = np.where(pl == p)[0]
-                hc_idxs = np.where(c >= args.hc_threshold)[0]
+                hc_idxs = np.where(c >= args.agreement_threshold)[0]
                 filter_idxs = np.intersect1d(agree_idxs, hc_idxs)
                 print(len(filter_idxs))
                 hc_set.include(pl[filter_idxs], filter_idxs)
@@ -1008,6 +1008,7 @@ if __name__ == "__main__":
     parser.add_argument('--soft_paws_cls', type=str2bool, default=True)
     parser.add_argument('--paws_cls_detach', type=str2bool, default=False)
     parser.add_argument('--paws_cls_smooth', type=float, default=0.1)
+    parser.add_argument('--agreement_threshold', type=float, default=0.8)
 
     parser.add_argument('--sspl_agreement', type=str2bool, default=False)
 
