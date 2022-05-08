@@ -261,7 +261,7 @@ class ImageList_pl_update(Dataset):
                                                                              "Supported image extensions are: " + ",".join(
                 IMG_EXTENSIONS)))
 
-        self.idxs = idxs
+        self.idxs = copy.deepcopy(idxs)
 
         self.imgs = imgs
         self.images = []
@@ -291,42 +291,27 @@ class ImageList_pl_update(Dataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target, index
+        return img, target, self.idxs[index]
 
     def __len__(self):
         return len(self.images)
 
     def include(self, pls, idxs):
-        success = 0
-        fail = 0
-        for idx in idxs:
-            try:
-                if idx not in self.idxs:
-                    self.idxs.append(idx)
-                    self.images.append(self.imgs[idx][0])
-                    self.targets.append(pls[idx])
-                    self.target_indices[pls[idx]].append(idx)
-                #success += 1
-            except:
-                pass
-                #fail += 1
-        #print("Include success: {:d} fail: {:d}".format(success, fail))
+        for true_idx, idx in enumerate(idxs):
+            if idx not in self.idxs:
+                self.idxs.append(idx)
+                self.images.append(self.imgs[idx][0])
+                self.targets = np.concatenate((self.targets, [pls[true_idx]]))
+                self.target_indices[pls[true_idx]].append(len(self.idxs) - 1)
 
     def exclude(self, idxs):
-        success = 0
-        fail = 0
         for idx in idxs:
-            try:
-                if idx in self.idxs:
-                    true_idx = self.idxs.index(idx)
-                    cls = self.targets[true_idx]
-                    idx_in_cls = self.target_indices[cls].index(idx)
-                    del self.idxs[true_idx]
-                    del self.images[true_idx]
-                    del self.targets[true_idx]
-                    del self.target_indices[cls][idx_in_cls]
-                #success += 1
-            except:
-                pass
-                #fail += 1
-        #print("Exclude success: {:d} fail: {:d}".format(success, fail))
+            if idx in self.idxs:
+                true_idx = self.idxs.index(idx)
+                cls = self.targets[true_idx]
+                idx_in_cls = self.target_indices[cls].index(true_idx)
+
+                self.idxs.pop(true_idx)
+                self.images.pop(true_idx)
+                self.targets = np.delete(self.targets, true_idx)
+                self.target_indices[cls].pop(idx_in_cls)
