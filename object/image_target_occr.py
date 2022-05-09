@@ -20,7 +20,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.cluster import KMeans
 from scipy.special import softmax
 from sklearn.preprocessing import normalize
-from paws import get_outputs, get_topk_conf_indices, snn, paws, ClassStratifiedSampler
+from paws import get_outputs, get_topk_conf_indices, snn, paws, ClassStratifiedSampler, sharpen
 
 
 def str2bool(v):
@@ -510,7 +510,7 @@ def train_target(args):
             labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
 
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
-            paws_p1 = snn(b3, b_hc, labels_hc_onehot)
+            paws_p1 = snn(b3, b_hc, labels_hc_onehot, tau=args.paws_temp)
 
             if args.paws_weight != 0:
                 if args.paws_detach:
@@ -519,7 +519,7 @@ def train_target(args):
                 else:
                     b1_detach = b1
                     b_hc_detach = b_hc
-                paws_p2 = snn(b1_detach, b_hc_detach, labels_hc_onehot)
+                paws_p2 = snn(b1_detach, b_hc_detach, labels_hc_onehot, tau=args.paws_temp)
                 paws_loss = paws(paws_p1, paws_p2)
                 classifier_loss += args.paws_weight * paws_loss
             else:
@@ -528,9 +528,12 @@ def train_target(args):
             if args.paws_cls_weight != 0:
                 if args.soft_paws_cls:
                     if args.paws_cls_detach:
-                        paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1.detach(), reduction='mean')
+                        paws_p = paws_p1.detach()
                     else:
-                        paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p1, reduction='mean')
+                        paws_p = paws_p1
+                    if args.sharpen_paws_p:
+                        paws_p = sharpen(paws_p)
+                    paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p, reduction='mean')
                 else:
                     _, paws_pl = torch.max(paws_p1.detach(), dim=1)
                     paws_cls = paws_cls_fn(outputs_test, paws_pl)
@@ -997,6 +1000,8 @@ if __name__ == "__main__":
     parser.add_argument('--cls_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
 
     parser.add_argument('--paws_pl_weight', type=float, default=0.0)
+    parser.add_argument('--paws_temp', type=float, default=0.1)
+    parser.add_argument('--sharpen_paws_p', type=str2bool, default=False)
 
     parser.add_argument('--separate_wd', type=str2bool, default=False)
 
