@@ -348,6 +348,7 @@ def train_target(args):
                                                     shuffle=True, num_workers=args.worker, drop_last=True)
                 max_iter = args.max_epoch * len(dset_loaders["target"])
                 interval_iter = max_iter // args.interval
+                hc_interval_iter = max_iter // args.hc_interval
 
             hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], transform=image_hc(args), idxs=hc_idxs)
 
@@ -400,6 +401,7 @@ def train_target(args):
                                                         shuffle=True, num_workers=args.worker, drop_last=True)
                     max_iter = args.max_epoch * len(dset_loaders["target"])
                     interval_iter = max_iter // args.interval
+                    hc_interval_iter = max_iter // args.hc_interval
                 print(len(hc_set), len(tgt_dataset))
 
         try:
