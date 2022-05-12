@@ -439,17 +439,18 @@ def train_target(args):
             f1 = netF(inputs_test1)
             b1 = netB(f1)
             outputs_test = netC(b1, labels_forward)
-        if args.sg2:
-            with torch.no_grad():
+        if args.paws_weight > 0:
+            if args.sg2:
+                with torch.no_grad():
+                    f2 = netF(inputs_test2)
+                    b2 = netB(f2)
+                    c2 = netC(b2, labels_forward)
+                    conf = torch.max(F.softmax(c2, dim=1), dim=1)[0]
+            else:
                 f2 = netF(inputs_test2)
                 b2 = netB(f2)
                 c2 = netC(b2, labels_forward)
                 conf = torch.max(F.softmax(c2, dim=1), dim=1)[0]
-        else:
-            f2 = netF(inputs_test2)
-            b2 = netB(f2)
-            c2 = netC(b2, labels_forward)
-            conf = torch.max(F.softmax(c2, dim=1), dim=1)[0]
 
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
@@ -508,16 +509,16 @@ def train_target(args):
             labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
 
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
-            paws_p1 = snn(b2, b_hc, labels_hc_onehot, tau=args.paws_temp)
+            paws_p1 = snn(b1, b_hc, labels_hc_onehot, tau=args.paws_temp)
 
             if args.paws_weight != 0:
                 if args.paws_detach:
-                    b1_detach = b1.clone().detach()
+                    b2_detach = b2.clone().detach()
                     b_hc_detach = b_hc.clone().detach()
                 else:
-                    b1_detach = b1
+                    b2_detach = b2
                     b_hc_detach = b_hc
-                paws_p2 = snn(b1_detach, b_hc_detach, labels_hc_onehot, tau=args.paws_temp)
+                paws_p2 = snn(b2_detach, b_hc_detach, labels_hc_onehot, tau=args.paws_temp)
                 paws_loss = paws(paws_p1, paws_p2)
                 classifier_loss += args.paws_weight * paws_loss
             else:
@@ -543,7 +544,7 @@ def train_target(args):
             if args.paws_cr_weight != 0:
                 with torch.no_grad():
                     sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
-                                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
+                                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing).detach()
                 paws_cr = dist(outputs_test, sspl_onehot)
                 classifier_loss += args.paws_cr_weight * paws_cr
             else:
