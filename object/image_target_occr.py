@@ -427,9 +427,9 @@ def train_target(args):
                 pred = None
 
         inputs_test1 = inputs_test[0].cuda()
-        # inputs_test2 = inputs_test[1].cuda()
-        if len(inputs_test) == 3:
-            inputs_test3 = inputs_test[2].cuda()
+        inputs_test2 = inputs_test[1].cuda()
+        #if len(inputs_test) == 3:
+        #    inputs_test3 = inputs_test[2].cuda()
 
         labels_forward = None
 
@@ -437,20 +437,17 @@ def train_target(args):
             f1 = netF(inputs_test1)
             b1 = netB(f1)
             outputs_test = netC(b1, labels_forward)
-        # if use_second_pass:
-        #    f2 = netF(inputs_test2)
-        #    b2 = netB(f2)
-        if args.sg3:
+        if args.sg2:
             with torch.no_grad():
-                f3 = netF(inputs_test3)
-                b3 = netB(f3)
-                c3 = netC(b3, labels_forward)
-                conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
+                f2 = netF(inputs_test2)
+                b2 = netB(f2)
+                c2 = netC(b2, labels_forward)
+                conf = torch.max(F.softmax(c2, dim=1), dim=1)[0]
         else:
-            f3 = netF(inputs_test3)
-            b3 = netB(f3)
-            c3 = netC(b3, labels_forward)
-            conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
+            f2 = netF(inputs_test2)
+            b2 = netB(f2)
+            c2 = netC(b2, labels_forward)
+            conf = torch.max(F.softmax(c2, dim=1), dim=1)[0]
 
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
@@ -458,13 +455,13 @@ def train_target(args):
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
                 f_hard = f1
-                f_weak = f3
+                f_weak = f2
             elif args.cr_site == 'btn':
                 f_hard = b1
-                f_weak = b3
+                f_weak = b2
             elif args.cr_site == 'cls':
                 f_hard = outputs_test
-                f_weak = c3
+                f_weak = c2
                 if args.cr_metric == 'kl':
                     f_hard = F.log_softmax(f_hard, dim=-1)
                 if args.cr_metric in ['bce', 'kl']:
@@ -480,8 +477,8 @@ def train_target(args):
 
             classifier_loss = cls_loss_fn(outputs_test[conf_cls >= args.conf_threshold],
                                           pred[conf_cls >= args.conf_threshold])
-            if args.cls3:
-                classifier_loss += cls_loss_fn(c3[conf_cls >= args.conf_threshold],
+            if args.cls2:
+                classifier_loss += cls_loss_fn(c2[conf_cls >= args.conf_threshold],
                                                pred[conf_cls >= args.conf_threshold])
             if args.cls_scheduling in ['const', 'step']:
                 classifier_loss *= args.cls_par
@@ -509,7 +506,7 @@ def train_target(args):
             labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
 
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
-            paws_p1 = snn(b3, b_hc, labels_hc_onehot, tau=args.paws_temp)
+            paws_p1 = snn(b2, b_hc, labels_hc_onehot, tau=args.paws_temp)
 
             if args.paws_weight != 0:
                 if args.paws_detach:
@@ -570,7 +567,7 @@ def train_target(args):
 
         if args.cr_weight > 0:
             try:
-                if args.sg3_cr and not args.sg3:
+                if args.sg2_cr and not args.sg2:
                     cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak.detach()[conf >= args.cr_threshold]).mean()
                 else:
                     cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak[conf >= args.cr_threshold]).mean()
@@ -932,17 +929,17 @@ if __name__ == "__main__":
     parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls', 'uniform'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
     parser.add_argument('--pl_temperature', type=float, default=1.0)
-    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
-    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
-    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug1', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug2', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug3', type=str, default='none', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug_pl', type=str, default='test', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug_cal', type=str, default='test', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug_hc', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--ra_n', type=int, default=1)
     parser.add_argument('--ra_m', type=int, default=10)
-    parser.add_argument('--sg3', type=str2bool, default=False)
-    parser.add_argument('--sg3_cr', type=str2bool, default=False)
-    parser.add_argument('--cls3', type=str2bool, default=False)
+    parser.add_argument('--sg2', type=str2bool, default=False)
+    parser.add_argument('--sg2_cr', type=str2bool, default=False)
+    parser.add_argument('--cls2', type=str2bool, default=False)
     parser.add_argument('--aug_strength', type=float, default=1.0)
     parser.add_argument('--custom_scale', default=True, type=str2bool)
     parser.add_argument('--use_rrc', default=True, type=str2bool)
