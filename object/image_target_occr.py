@@ -541,8 +541,9 @@ def train_target(args):
                 paws_cls = torch.tensor(0.0).cuda()
 
             if args.paws_cr_weight != 0:
-                sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
-                                   * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
+                with torch.no_grad():
+                    sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
+                                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
                 paws_cr = dist(outputs_test, sspl_onehot)
                 classifier_loss += args.paws_cr_weight * paws_cr
             else:
