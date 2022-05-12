@@ -302,7 +302,7 @@ def train_target(args):
                 inputs, labels, tar_idx = iter_memax.next()
 
             if args.wa_to_memax:
-                inputs = inputs[2].cuda()
+                inputs = inputs[1].cuda()
             else:
                 inputs = inputs[0].cuda()
 
