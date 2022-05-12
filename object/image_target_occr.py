@@ -544,7 +544,7 @@ def train_target(args):
             if args.paws_cr_weight != 0:
                 with torch.no_grad():
                     sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
-                                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing).detach()
+                                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
                 paws_cr = dist(outputs_test, sspl_onehot)
                 classifier_loss += args.paws_cr_weight * paws_cr
             else:
