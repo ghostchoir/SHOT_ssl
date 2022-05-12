@@ -1025,8 +1025,8 @@ if __name__ == "__main__":
     args.ent = not args.noent
     args.gent = not args.nogent
 
-    assert not (args.cr_weight > 0 and args.aug3 == 'none')
-    assert not (args.sg3 and args.cls3)
+    assert not (args.cr_weight > 0 and args.aug2 == 'none')
+    assert not (args.sg2 and args.cls2)
 
     if args.dset == 'office-home':
         names = ['Art', 'Clipart', 'Product', 'RealWorld']
