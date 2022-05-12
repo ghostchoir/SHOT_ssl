@@ -404,7 +404,7 @@ def train_target(args):
                     interval_iter = max_iter // args.interval
                     hc_interval_iter = max_iter // args.hc_interval
                     iter_test = iter(dset_loaders["target"])
-                print(len(hc_set), len(tgt_dataset))
+                    print(len(hc_set), len(tgt_dataset))
 
         try:
             inputs_test, labels_test, tar_idx = iter_test.next()
