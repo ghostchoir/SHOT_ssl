@@ -332,7 +332,7 @@ def train_target(args):
 
     while iter_num < max_iter:
 
-        if iter_num % hc_interval_iter == 0 and use_hc:
+        if iter_num % interval_iter == 0:
             netF.eval()
             netH.eval()
             netB.eval()
@@ -349,7 +349,7 @@ def train_target(args):
                 max_iter = args.max_epoch * len(dset_loaders["target"])
                 interval_iter = max_iter // args.interval
                 hc_interval_iter = max_iter // args.hc_interval
-                #iter_test = iter(dset_loaders["target"])
+                # iter_test = iter(dset_loaders["target"])
 
             hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], transform=image_hc(args), idxs=hc_idxs)
 
@@ -361,18 +361,7 @@ def train_target(args):
 
             args.hc_threshold = min(args.hc_threshold + args.hc_threshold_increase, args.hc_threshold_max)
 
-            netF.train()
-            netH.train()
-            netB.train()
-
-        if iter_num % interval_iter == 0 and (args.sspl_agreement or args.cls_par > 0):
-            netF.eval()
-            netH.eval()
-            netB.eval()
-            if args.eval_off_once:
-                eval_off = iter_num == 0
-            else:
-                eval_off = True
+            eval_off = False
             if args.aug_pl == args.aug_cal:
                 pl, mem_conf, centroids, labelset, pred = obtain_label(dset_loaders['pl'], netF, netH, netB, netC,
                                                                        args, mem_label, eval_off, f, o, gt_labels)
@@ -396,7 +385,7 @@ def train_target(args):
                 hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
                 iter_hc = iter(hc_loader)
-                if args.exclude_lc:
+                if args.exclude_agreement_lc:
                     tgt_dataset.exclude(filter_idxs)
                     dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size,
                                                         shuffle=True, num_workers=args.worker, drop_last=True)
@@ -404,13 +393,13 @@ def train_target(args):
                     interval_iter = max_iter // args.interval
                     hc_interval_iter = max_iter // args.hc_interval
                     #iter_test = iter(dset_loaders["target"])
-                    print(len(hc_set), len(tgt_dataset), len(iter_test), iter_num, max_iter, interval_iter, hc_interval_iter)
+                    print(len(hc_set), len(tgt_dataset), iter_num, max_iter, interval_iter)
 
         try:
             inputs_test, labels_test, tar_idx = iter_test.next()
         except:
-            print("Tgt dataloader reloaded")
             iter_test = iter(dset_loaders["target"])
+            print("Tgt dataloader reloaded", len(iter_test))
             inputs_test, labels_test, tar_idx = iter_test.next()
 
         try:
@@ -1012,6 +1001,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--reset_lc', type=str2bool, default=True)
     parser.add_argument('--exclude_lc', type=str2bool, default=True)
+    parser.add_argument('--exclude_agreement_lc', type=str2bool, default=False)
     parser.add_argument('--hc_threshold_increase', type=float, default=0.0)
     parser.add_argument('--hc_threshold_max', type=float, default=0.9)
     parser.add_argument('--soft_paws_cls', type=str2bool, default=True)
