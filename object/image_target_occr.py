@@ -352,8 +352,9 @@ def train_target(args):
                 # iter_test = iter(dset_loaders["target"])
 
             hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], transform=image_hc(args), idxs=hc_idxs)
-
-            hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, args.paws_batch_size, args.class_num, seed=args.seed)
+            hc_bsize = min(args.paws_batch_size, len(hc_set) // args.class_num)
+            hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize, args.class_num, seed=args.seed)
+            print('HC bsize is set to', hc_bsize)
 
             hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
@@ -383,8 +384,9 @@ def train_target(args):
                                                   args.agreement_threshold)
                 print(len(filter_idxs), len(topk_idxs))
                 hc_set.include(pl[topk_idxs], topk_idxs)
-                hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, args.paws_batch_size, args.class_num, seed=args.seed)
-
+                hc_bsize = min(args.paws_batch_size, len(hc_set) // args.class_num)
+                hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize, args.class_num, seed=args.seed)
+                print('HC bsize is set to', hc_bsize)
                 hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
                 iter_hc = iter(hc_loader)
