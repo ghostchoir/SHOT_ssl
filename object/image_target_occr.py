@@ -344,8 +344,8 @@ def train_target(args):
                 if args.reset_lc:
                     tgt_dataset = copy.deepcopy(backup_dset)
                 tgt_dataset.exclude(hc_idxs)
-                dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size,
-                                                    shuffle=True, num_workers=args.worker, drop_last=True)
+                dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size, shuffle=True,
+                                                    num_workers=args.worker, drop_last=True, pin_memory=True)
                 max_iter = args.max_epoch * len(dset_loaders["target"])
                 interval_iter = max_iter // args.interval
                 hc_interval_iter = max_iter // args.hc_interval
@@ -378,21 +378,24 @@ def train_target(args):
                 agree_idxs = np.where(pl == p)[0]
                 hc_idxs = np.where(c >= args.agreement_threshold)[0]
                 filter_idxs = np.intersect1d(agree_idxs, hc_idxs)
-                print(len(filter_idxs))
-                hc_set.include(pl[filter_idxs], filter_idxs)
+
+                topk_idxs = get_topk_conf_indices(c[filter_idxs], p[filter_idxs], args.class_num, args.agreement_topk,
+                                                  args.agreement_threshold)
+                print(len(filter_idxs), len(topk_idxs))
+                hc_set.include(pl[topk_idxs], topk_idxs)
                 hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, args.paws_batch_size, args.class_num, seed=args.seed)
 
                 hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
                 iter_hc = iter(hc_loader)
                 if args.exclude_agreement_lc:
-                    tgt_dataset.exclude(filter_idxs)
-                    dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size,
-                                                        shuffle=True, num_workers=args.worker, drop_last=True)
+                    tgt_dataset.exclude(topk_idxs)
+                    dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size, shuffle=True,
+                                                        num_workers=args.worker, drop_last=True, pin_memory=True)
                     max_iter = args.max_epoch * len(dset_loaders["target"])
                     interval_iter = max_iter // args.interval
                     hc_interval_iter = max_iter // args.hc_interval
-                    #iter_test = iter(dset_loaders["target"])
+                    # iter_test = iter(dset_loaders["target"])
                     print(len(hc_set), len(tgt_dataset), iter_num, max_iter, interval_iter)
 
         try:
