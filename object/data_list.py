@@ -214,7 +214,7 @@ class ImageList_update(Dataset):
             target = self.target_transform(target)
 
         if self.return_idx:
-            return img, target, index
+            return img, target, self.idxs[index]
         else:
             return img, target
 
