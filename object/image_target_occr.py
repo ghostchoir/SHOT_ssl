@@ -389,6 +389,8 @@ def train_target(args):
 
                 iter_hc = iter(hc_loader)
                 if args.exclude_agreement_lc:
+                    if args.reset_lc and not args.exclude_lc:
+                        tgt_dataest = copy.deepcopy(backup_dset)
                     tgt_dataset.exclude(topk_idxs)
                     dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size, shuffle=True,
                                                         num_workers=args.worker, drop_last=True, pin_memory=True)
