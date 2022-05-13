@@ -430,7 +430,7 @@ def train_target(args):
 
         inputs_test1 = inputs_test[0].cuda()
         inputs_test2 = inputs_test[1].cuda()
-        #if len(inputs_test) == 3:
+        # if len(inputs_test) == 3:
         #    inputs_test3 = inputs_test[2].cuda()
 
         labels_forward = None
@@ -503,11 +503,15 @@ def train_target(args):
 
             inputs_hc = inputs_hc.cuda()
             b_hc = netB(netF(inputs_hc))
+            c_hc = netC(b_hc, labels_forward)
             labels_hc = labels_hc.cuda()
             labels_hc_onehot = F.one_hot(labels_hc, num_classes=args.class_num) \
                                * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
             labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
 
+            softmax_out = nn.Softmax(dim=1)(c_hc)
+            paws_entropy_loss = torch.mean(loss.Entropy(softmax_out))
+            classifier_loss += paws_entropy_loss
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
             paws_p1 = snn(b1, b_hc, labels_hc_onehot, tau=args.paws_temp)
 
@@ -542,10 +546,10 @@ def train_target(args):
                 paws_cls = torch.tensor(0.0).cuda()
 
             if args.paws_cr_weight != 0:
-                #with torch.no_grad():
+                # with torch.no_grad():
                 #    sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
                 #                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
-                #paws_cr = dist(paws_p1, sspl_onehot)
+                # paws_cr = dist(paws_p1, sspl_onehot)
                 paws_cr = paws_cls_fn(paws_p1, pred)
                 classifier_loss += args.paws_cr_weight * paws_cr
             else:
@@ -603,12 +607,14 @@ def train_target(args):
             netH.eval()
             netB.eval()
             print(len(hc_set.idxs), 'samples are in HC set')
-            print('KMEANS: {:.3f} PAWS: {:.3f} CLS: {:.3f} CR: {:.3f} Ent: {:.3f} ME: {:.3f}'.format(pl_loss,
-                                                                                                     paws_loss.item(),
-                                                                                                     paws_cls.item(),
-                                                                                                     paws_cr.item(),
-                                                                                                     im_loss.item(),
-                                                                                                     gentropy_loss.item()))
+            print(
+                'KMEANS: {:.3f} PAWS: {:.3f} Ent: {:.3f} CLS: {:.3f} CR: {:.3f} Ent: {:.3f} ME: {:.3f}'.format(pl_loss,
+                                                                                                               paws_loss.item(),
+                                                                                                               paws_entropy_loss.item(),
+                                                                                                               paws_cls.item(),
+                                                                                                               paws_cr.item(),
+                                                                                                               im_loss.item(),
+                                                                                                               gentropy_loss.item()))
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter,
