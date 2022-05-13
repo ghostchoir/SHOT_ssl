@@ -510,9 +510,6 @@ def train_target(args):
                                * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
             labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
 
-            hc_softmax_out = nn.Softmax(dim=1)(c_hc)
-            paws_entropy_loss = torch.mean(loss.Entropy(hc_softmax_out))
-            classifier_loss += paws_entropy_loss
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
             paws_p1 = snn(b1, b_hc, labels_hc_onehot, tau=args.paws_temp)
 
@@ -537,15 +534,27 @@ def train_target(args):
             dh_correct_paws = paws_pred[dh].cpu() == gt[dh]
             dl_correct_paws = paws_pred[dl].cpu() == gt[dl]
 
-            print(ah.sum().item(), ah_correct.sum().item(), '\n',
-                  al.sum().item(), al_correct.sum().item(), '\n',
-                  dh.sum().item(), dh_correct.sum().item(), dh_correct_paws.sum().item(), '\n',
+            print('AH', ah.sum().item(), ah_correct.sum().item(), '\nAL',
+                  al.sum().item(), al_correct.sum().item(), '\nDH',
+                  dh.sum().item(), dh_correct.sum().item(), dh_correct_paws.sum().item(), '\nDL',
                   dl.sum().item(), dl_correct.sum().item(), dl_correct_paws.sum().item())
 
-            softmax_out = nn.Softmax(dim=1)(outputs_test)
-            ah_ent = torch.mean(loss.Entropy(softmax_out[ah]))
-            classifier_loss += ah_ent
+            classifier_loss = cls_loss_fn(outputs_test[agree],
+                                          pred[agree])
 
+
+            hc_softmax_out = nn.Softmax(dim=1)(c_hc)
+            paws_entropy_loss = torch.mean(loss.Entropy(hc_softmax_out))
+            classifier_loss += paws_entropy_loss
+
+            softmax_out = nn.Softmax(dim=1)(outputs_test)
+            msoftmax = softmax_out.mean(dim=0)
+
+            a_ent = torch.mean(loss.Entropy(softmax_out[agree]))
+            classifier_loss += a_ent
+
+            d_me = torch.sum(-msoftmax[disagree] * torch.log(msoftmax[disagree] + args.epsilon))
+            classifier_loss -= d_me
 
             if args.paws_weight != 0:
                 if args.paws_detach:
@@ -563,15 +572,15 @@ def train_target(args):
             if args.paws_cls_weight != 0:
                 if args.soft_paws_cls:
                     if args.paws_cls_detach:
-                        paws_p = paws_p1.detach()
+                        paws_p = paws_p1[disagree].detach()
                     else:
-                        paws_p = paws_p1
+                        paws_p = paws_p1[disagree]
                     if args.sharpen_paws_p:
-                        paws_p = sharpen(paws_p)
-                    paws_cls = F.binary_cross_entropy_with_logits(outputs_test, paws_p, reduction='mean')
+                        paws_p = sharpen(paws_p[disagree])
+                    paws_cls = F.binary_cross_entropy_with_logits(outputs_test[disagree], paws_p, reduction='mean')
                 else:
-                    _, paws_pl = torch.max(paws_p1.detach(), dim=1)
-                    paws_cls = paws_cls_fn(outputs_test, paws_pl)
+                    _, paws_pl = torch.max(paws_p1[disagree].detach(), dim=1)
+                    paws_cls = paws_cls_fn(outputs_test[disagree], paws_pl)
 
                 classifier_loss += args.paws_weight * paws_cls
             else:
@@ -582,7 +591,7 @@ def train_target(args):
                 #    sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
                 #                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
                 # paws_cr = dist(paws_p1, sspl_onehot)
-                paws_cr = paws_cls_fn(paws_p1, pred)
+                paws_cr = paws_cls_fn(paws_p1[disagree], pred[disagree])
                 classifier_loss += args.paws_cr_weight * paws_cr
             else:
                 paws_cr = torch.tensor(0.0).cuda()
