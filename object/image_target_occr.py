@@ -1105,7 +1105,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_threshold', type=float, default=0.8)
     parser.add_argument('--full_logging', type=str2bool, default=True)
     parser.add_argument('--label_mutate_p', type=float, default=0.0)
-    parser.add_argument('--mutate_p_delta', type=float, default=-0.1)
+    parser.add_argument('--mutate_p_delta', type=float, default=0)
     parser.add_argument('--mutate_mode', type=str, default='dl', choices=['dl', 'd', 'dal'])
     parser.add_argument('--minent_mode', type=str, default='all', choices=['all', 'a', 'ah', 'h'])
     parser.add_argument('--memax_mode', type=str, default='all', choices=['all', 'd', 'dl', 'l'])
