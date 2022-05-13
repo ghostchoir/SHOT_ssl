@@ -561,9 +561,25 @@ def train_target(args):
             classifier_loss += paws_entropy_loss
 
             softmax_out = nn.Softmax(dim=1)(outputs_test)
-            msoftmax = softmax_out[torch.logical_or(al, disagree)].mean(dim=0)
+            if args.memax_mode == 'all':
+                memax_idx = torch.logical_or(agree, disagree)
+            elif args.memax_mode == 'd':
+                memax_idx = disagree
+            elif args.memax_mode == 'dl':
+                memax_idx = dl
+            elif args.memax_mode == 'l':
+                memax_idx = lc
+            msoftmax = softmax_out[memax_idx].mean(dim=0)
 
-            a_ent = torch.mean(loss.Entropy(softmax_out[ah]))
+            if args.minent_mode == 'all':
+                minent_idx = torch.logical_or(agree, disagree)
+            elif args.minent_mode == 'a':
+                minent_idx = agree
+            elif args.minent_mode == 'ah':
+                minent_idx = ah
+            elif args.minent_mode == 'h':
+                minent_idx = hc
+            a_ent = torch.mean(loss.Entropy(softmax_out[minent_idx]))
             classifier_loss += a_ent
 
             d_me = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
@@ -1086,6 +1102,8 @@ if __name__ == "__main__":
     parser.add_argument('--full_logging', type=str2bool, default=True)
     parser.add_argument('--label_mutate_p', type=float, default=0.0)
     parser.add_argument('--mutate_mode', type=str, default='dl', choices=['dl', 'd', 'dal'])
+    parser.add_argument('--minent_mode', type=str, default='all', choices=['all', 'a', 'ah', 'h'])
+    parser.add_argument('--memax_mode', type=str, default='all', choices=['all', 'd', 'dl', 'l'])
     parser.add_argument('--ce_hc', type=str2bool, default=False)
 
     args = parser.parse_args()
