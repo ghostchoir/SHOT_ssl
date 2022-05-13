@@ -557,9 +557,10 @@ def train_target(args):
             if args.ce_hc:
                 classifier_loss += cls_loss_fn(c_hc, labels_hc)
 
-            hc_softmax_out = nn.Softmax(dim=1)(c_hc)
-            paws_entropy_loss = torch.mean(loss.Entropy(hc_softmax_out))
-            classifier_loss += paws_entropy_loss
+            if args.minent_hc:
+                hc_softmax_out = nn.Softmax(dim=1)(c_hc)
+                paws_entropy_loss = torch.mean(loss.Entropy(hc_softmax_out))
+                classifier_loss += paws_entropy_loss
 
             softmax_out = nn.Softmax(dim=1)(outputs_test)
             if args.memax_mode == 'all':
@@ -1107,6 +1108,7 @@ if __name__ == "__main__":
     parser.add_argument('--minent_mode', type=str, default='all', choices=['all', 'a', 'ah', 'h'])
     parser.add_argument('--memax_mode', type=str, default='all', choices=['all', 'd', 'dl', 'l'])
     parser.add_argument('--ce_hc', type=str2bool, default=False)
+    parser.add_argument('--minent_hc', type=str2bool, default=False)
 
     args = parser.parse_args()
 
