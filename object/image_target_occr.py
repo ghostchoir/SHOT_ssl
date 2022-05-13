@@ -444,18 +444,17 @@ def train_target(args):
             b1 = netB(f1)
             outputs_test = netC(b1, labels_forward)
             conf1 = torch.max(F.softmax(outputs_test, dim=1), dim=1)[0]
-        if args.paws_weight > 0:
-            if args.sg2:
-                with torch.no_grad():
-                    f2 = netF(inputs_test2)
-                    b2 = netB(f2)
-                    c2 = netC(b2, labels_forward)
-                    conf2 = torch.max(F.softmax(c2, dim=1), dim=1)[0]
-            else:
+        if args.sg2:
+            with torch.no_grad():
                 f2 = netF(inputs_test2)
                 b2 = netB(f2)
                 c2 = netC(b2, labels_forward)
                 conf2 = torch.max(F.softmax(c2, dim=1), dim=1)[0]
+        else:
+            f2 = netF(inputs_test2)
+            b2 = netB(f2)
+            c2 = netC(b2, labels_forward)
+            conf2 = torch.max(F.softmax(c2, dim=1), dim=1)[0]
 
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
@@ -515,7 +514,7 @@ def train_target(args):
             labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
 
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
-            paws_p1 = snn(b1, b_hc, labels_hc_onehot, tau=args.paws_temp)
+            paws_p1 = snn(b2, b_hc, labels_hc_onehot, tau=args.paws_temp)
 
             gt = torch.from_numpy(gt_labels[tar_idx])
             _, paws_pred = torch.max(paws_p1, dim=1)
@@ -561,12 +560,12 @@ def train_target(args):
 
             if args.paws_weight != 0:
                 if args.paws_detach:
-                    b2_detach = b2.clone().detach()
+                    b1_detach = b1.clone().detach()
                     b_hc_detach = b_hc.clone().detach()
                 else:
-                    b2_detach = b2
+                    b1_detach = b1
                     b_hc_detach = b_hc
-                paws_p2 = snn(b2_detach, b_hc_detach, labels_hc_onehot, tau=args.paws_temp)
+                paws_p2 = snn(b1_detach, b_hc_detach, labels_hc_onehot, tau=args.paws_temp)
                 paws_loss = paws(paws_p1, paws_p2)
                 classifier_loss += args.paws_weight * paws_loss
             else:
@@ -1074,6 +1073,7 @@ if __name__ == "__main__":
     parser.add_argument('--sspl_agreement', type=str2bool, default=False)
     parser.add_argument('--batch_threshold', type=float, default=0.8)
     parser.add_argument('--full_logging', type=str2bool, default=True)
+    parser.add_argument('--label_mutate_p', type=float, default=0.0)
 
     args = parser.parse_args()
 
