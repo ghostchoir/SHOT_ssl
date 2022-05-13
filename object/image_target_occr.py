@@ -552,7 +552,9 @@ def train_target(args):
                     mut_idx = torch.logical_or(disagree, al)
                 pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
             classifier_loss = cls_loss_fn(outputs_test, pred)
-            classifier_loss += cls_loss_fn(c_hc, labels_hc)
+
+            if args.ce_hc:
+                classifier_loss += cls_loss_fn(c_hc, labels_hc)
 
             hc_softmax_out = nn.Softmax(dim=1)(c_hc)
             paws_entropy_loss = torch.mean(loss.Entropy(hc_softmax_out))
@@ -1084,6 +1086,7 @@ if __name__ == "__main__":
     parser.add_argument('--full_logging', type=str2bool, default=True)
     parser.add_argument('--label_mutate_p', type=float, default=0.0)
     parser.add_argument('--mutate_mode', type=str, default='dl', choices=['dl', 'd', 'dal'])
+    parser.add_argument('--ce_hc', type=str2bool, default=False)
 
     args = parser.parse_args()
 
