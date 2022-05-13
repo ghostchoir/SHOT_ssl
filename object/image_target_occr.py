@@ -561,6 +561,8 @@ def train_target(args):
                 hc_softmax_out = nn.Softmax(dim=1)(c_hc)
                 paws_entropy_loss = torch.mean(loss.Entropy(hc_softmax_out))
                 classifier_loss += paws_entropy_loss
+            else:
+                paws_entropy_loss = torch.tensor(0.0).cuda()
 
             softmax_out = nn.Softmax(dim=1)(outputs_test)
             if args.memax_mode == 'all':
