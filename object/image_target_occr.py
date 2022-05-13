@@ -498,7 +498,7 @@ def train_target(args):
 
         pl_loss = classifier_loss.item()
 
-        if use_hc:
+        if True:
             try:
                 inputs_hc, labels_hc, _ = iter_hc.next()
             except:
