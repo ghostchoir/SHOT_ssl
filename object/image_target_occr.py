@@ -522,7 +522,7 @@ def train_target(args):
             disagree = pred != paws_pred
 
             hc = conf1 >= args.batch_threshold
-            lc = conf2 < args.batch_threshold
+            lc = conf1 < args.batch_threshold
 
             ah = torch.logical_and(agree, hc)
             al = torch.logical_and(agree, lc)
