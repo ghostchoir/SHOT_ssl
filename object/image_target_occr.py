@@ -572,7 +572,7 @@ def train_target(args):
             else:
                 paws_loss = torch.tensor(0.0).cuda()
 
-            if args.paws_cls_weight != 0:
+            if args.paws_cls_weight != 0 and disagree.sum().item() != 0:
                 if args.soft_paws_cls:
                     if args.paws_cls_detach:
                         paws_p = paws_p1[disagree].detach()
@@ -589,7 +589,7 @@ def train_target(args):
             else:
                 paws_cls = torch.tensor(0.0).cuda()
 
-            if args.paws_cr_weight != 0:
+            if args.paws_cr_weight != 0 and disagree.sum().item() != 0:
                 # with torch.no_grad():
                 #    sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
                 #                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
