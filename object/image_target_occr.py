@@ -1042,6 +1042,7 @@ if __name__ == "__main__":
     parser.add_argument('--agreement_topk', type=int, default=12)
 
     parser.add_argument('--sspl_agreement', type=str2bool, default=False)
+    parser.add_argument('--batch_threshold', type=float, default=0.8)
 
     args = parser.parse_args()
 
