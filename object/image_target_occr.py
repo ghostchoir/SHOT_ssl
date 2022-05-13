@@ -539,9 +539,7 @@ def train_target(args):
                   dh.sum().item(), dh_correct.sum().item(), dh_correct_paws.sum().item(), '\nDL',
                   dl.sum().item(), dl_correct.sum().item(), dl_correct_paws.sum().item())
 
-            classifier_loss = cls_loss_fn(outputs_test[agree],
-                                          pred[agree])
-
+            classifier_loss = cls_loss_fn(outputs_test, pred)
 
             hc_softmax_out = nn.Softmax(dim=1)(c_hc)
             paws_entropy_loss = torch.mean(loss.Entropy(hc_softmax_out))
