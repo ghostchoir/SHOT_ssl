@@ -510,12 +510,13 @@ def train_target(args):
                                * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
             labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
 
-            softmax_out = nn.Softmax(dim=1)(c_hc)
-            paws_entropy_loss = torch.mean(loss.Entropy(softmax_out))
+            hc_softmax_out = nn.Softmax(dim=1)(c_hc)
+            paws_entropy_loss = torch.mean(loss.Entropy(hc_softmax_out))
             classifier_loss += paws_entropy_loss
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
             paws_p1 = snn(b1, b_hc, labels_hc_onehot, tau=args.paws_temp)
 
+            gt = gt_labels[tar_idx]
             _, paws_pred = torch.max(paws_p1, dim=1)
 
             agree = pred == paws_pred
@@ -529,7 +530,20 @@ def train_target(args):
             dh = torch.logical_and(disagree, hc)
             dl = torch.logical_and(disagree, lc)
 
-            print(ah.sum().item(), al.sum().item(), dh.sum().item(), dl.sum().item())
+            ah_correct = pred[ah] == gt[ah]
+            al_correct = pred[al] == gt[al]
+            dh_correct = pred[dh] == gt[dh]
+            dl_correct = pred[dl] == gt[dl]
+
+            print(ah.sum().item(), ah_correct.sum().item(),
+                  al.sum().item(), al_correct.sum().item(),
+                  dh.sum().item(), dh_correct.sum().item(),
+                  dl.sum().item(), dl_correct.sum().item())
+
+            softmax_out = nn.Softmax(dim=1)(outputs_test)
+            ah_ent = torch.mean(loss.Entropy(softmax_out[ah]))
+            classifier_loss += ah_ent
+
 
             if args.paws_weight != 0:
                 if args.paws_detach:
