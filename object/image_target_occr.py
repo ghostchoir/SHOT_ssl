@@ -544,7 +544,13 @@ def train_target(args):
                       dl.sum().item(), dl_correct.sum().item(), dl_correct_paws.sum().item())
 
             if random.random() <= args.label_mutate_p and dl.sum().item() > 0:
-                pred[dl] = torch.randint(low=0, high=args.class_num, size=pred[dl].size()).cuda()
+                if args.mutate_mode == 'dl':
+                    mut_idx = dl
+                elif args.mutate_mode == 'd':
+                    mut_idx = disagree
+                elif args.mutate_mode == 'dal':
+                    mut_idx = torch.logical_or(disagree, al)
+                pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
             classifier_loss = cls_loss_fn(outputs_test, pred)
             classifier_loss += cls_loss_fn(c_hc, labels_hc)
 
@@ -1077,6 +1083,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_threshold', type=float, default=0.8)
     parser.add_argument('--full_logging', type=str2bool, default=True)
     parser.add_argument('--label_mutate_p', type=float, default=0.0)
+    parser.add_argument('--mutate_mode', type=str, default='dl', choices=['dl', 'd', 'dal'])
 
     args = parser.parse_args()
 
