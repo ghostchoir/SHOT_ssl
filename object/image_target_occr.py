@@ -339,6 +339,10 @@ def train_target(args):
 
             c, p, f, o = get_outputs(dset_loaders['cal'], netF, netH, netB, netC)
             hc_idxs = get_topk_conf_indices(c, p, n_classes=args.class_num, k=args.hc_topk, threshold=args.hc_threshold)
+
+            prev_topk = args.hc_topk
+            args.hc_topk = min(args.hc_topk + args.hc_topk_increase, args.hc_topk_max)
+            print('HC topk change', prev_topk, '->', args.hc_topk)
             min_conf = np.min(p[hc_idxs])
             if args.exclude_lc:
                 if args.reset_lc:
@@ -534,10 +538,11 @@ def train_target(args):
             dh_correct_paws = paws_pred[dh].cpu() == gt[dh]
             dl_correct_paws = paws_pred[dl].cpu() == gt[dl]
 
-            print('AH', ah.sum().item(), ah_correct.sum().item(), '\nAL',
-                  al.sum().item(), al_correct.sum().item(), '\nDH',
-                  dh.sum().item(), dh_correct.sum().item(), dh_correct_paws.sum().item(), '\nDL',
-                  dl.sum().item(), dl_correct.sum().item(), dl_correct_paws.sum().item())
+            if args.full_logging:
+                print('AH', ah.sum().item(), ah_correct.sum().item(), '\nAL',
+                      al.sum().item(), al_correct.sum().item(), '\nDH',
+                      dh.sum().item(), dh_correct.sum().item(), dh_correct_paws.sum().item(), '\nDL',
+                      dl.sum().item(), dl_correct.sum().item(), dl_correct_paws.sum().item())
 
             classifier_loss = cls_loss_fn(outputs_test, pred)
 
@@ -969,6 +974,8 @@ if __name__ == "__main__":
     parser.add_argument('--paws_batch_size', type=int, default=6)
     parser.add_argument('--sharpening_temperature', type=float, default=0.25)
     parser.add_argument('--hc_topk', type=int, default=100)
+    parser.add_argument('--hc_topk_increase', type=int, default=12)
+    parser.add_argument('--hc_topk_max', type=int, default=120)
     parser.add_argument('--hc_threshold', type=float, default=0.0)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
@@ -1066,6 +1073,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--sspl_agreement', type=str2bool, default=False)
     parser.add_argument('--batch_threshold', type=float, default=0.8)
+    parser.add_argument('--full_logging', type=str2bool, default=True)
 
     args = parser.parse_args()
 
