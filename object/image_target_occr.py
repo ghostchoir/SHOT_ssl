@@ -544,7 +544,7 @@ def train_target(args):
                       dl.sum().item(), dl_correct.sum().item(), dl_correct_paws.sum().item())
 
             if random.random() <= args.label_mutate_p and dl.sum().item() > 0:
-                pred[dl] = torch.randint(low=0, high=args.class_num, size=pred[dl].size())
+                pred[dl] = torch.randint(low=0, high=args.class_num, size=pred[dl].size()).cuda()
             classifier_loss = cls_loss_fn(outputs_test, pred)
             classifier_loss += cls_loss_fn(c_hc, labels_hc)
 
