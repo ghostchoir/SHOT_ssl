@@ -548,12 +548,12 @@ def train_target(args):
             classifier_loss += paws_entropy_loss
 
             softmax_out = nn.Softmax(dim=1)(outputs_test)
-            msoftmax = softmax_out.mean(dim=0)
+            msoftmax = softmax_out[disagree].mean(dim=0)
 
             a_ent = torch.mean(loss.Entropy(softmax_out[agree]))
             classifier_loss += a_ent
 
-            d_me = torch.sum(-msoftmax[disagree] * torch.log(msoftmax[disagree] + args.epsilon))
+            d_me = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
             classifier_loss -= d_me
 
             if args.paws_weight != 0:
