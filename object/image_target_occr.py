@@ -322,7 +322,7 @@ def train_target(args):
     gt_labels = np.array(copy.deepcopy(dset_loaders["target"].dataset.targets))
     iter_num = 0
 
-    if args.paws_cls_weight != 0:
+    if args.paws_cls_weight != 0 or args.paws_cr_weight != 0:
         if args.paws_cls_smooth == 0:
             paws_cls_fn = nn.CrossEntropyLoss()
         else:
@@ -542,10 +542,11 @@ def train_target(args):
                 paws_cls = torch.tensor(0.0).cuda()
 
             if args.paws_cr_weight != 0:
-                with torch.no_grad():
-                    sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
-                                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
-                paws_cr = dist(paws_p1, sspl_onehot)
+                #with torch.no_grad():
+                #    sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
+                #                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
+                #paws_cr = dist(paws_p1, sspl_onehot)
+                paws_cr = paws_cls_fn(paws_p1, pred)
                 classifier_loss += args.paws_cr_weight * paws_cr
             else:
                 paws_cr = torch.tensor(0.0).cuda()
