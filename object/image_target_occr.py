@@ -439,18 +439,19 @@ def train_target(args):
             f1 = netF(inputs_test1)
             b1 = netB(f1)
             outputs_test = netC(b1, labels_forward)
+            conf1 = torch.max(F.softmax(outputs_test, dim=1), dim=1)[0]
         if args.paws_weight > 0:
             if args.sg2:
                 with torch.no_grad():
                     f2 = netF(inputs_test2)
                     b2 = netB(f2)
                     c2 = netC(b2, labels_forward)
-                    conf = torch.max(F.softmax(c2, dim=1), dim=1)[0]
+                    conf2 = torch.max(F.softmax(c2, dim=1), dim=1)[0]
             else:
                 f2 = netF(inputs_test2)
                 b2 = netB(f2)
                 c2 = netC(b2, labels_forward)
-                conf = torch.max(F.softmax(c2, dim=1), dim=1)[0]
+                conf2 = torch.max(F.softmax(c2, dim=1), dim=1)[0]
 
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
@@ -514,6 +515,21 @@ def train_target(args):
             classifier_loss += paws_entropy_loss
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
             paws_p1 = snn(b1, b_hc, labels_hc_onehot, tau=args.paws_temp)
+
+            _, paws_pred = torch.max(paws_p1, dim=1)
+
+            agree = pred == paws_pred
+            disagree = pred != paws_pred
+
+            hc = conf1 >= args.batch_threshold
+            lc = conf2 < args.batch_threshold
+
+            ah = torch.logical_and(agree, hc)
+            al = torch.logical_and(agree, lc)
+            dh = torch.logical_and(disagree, hc)
+            dl = torch.logical_and(disagree, lc)
+
+            print(ah.sum().item(), al.sum().item(), dh.sum().item(), dl.sum().item())
 
             if args.paws_weight != 0:
                 if args.paws_detach:
@@ -579,9 +595,9 @@ def train_target(args):
         if args.cr_weight > 0:
             try:
                 if args.sg2_cr and not args.sg2:
-                    cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak.detach()[conf >= args.cr_threshold]).mean()
+                    cr_loss = dist(f_hard[conf1 >= args.cr_threshold], f_weak.detach()[conf1 >= args.cr_threshold]).mean()
                 else:
-                    cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak[conf >= args.cr_threshold]).mean()
+                    cr_loss = dist(f_hard[conf1 >= args.cr_threshold], f_weak[conf1 >= args.cr_threshold]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
