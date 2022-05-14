@@ -28,7 +28,9 @@ def get_topk_conf_indices(confs, preds, n_classes=12, k=100, threshold=0.5):
 
     k = min(k, thres_k)
 
-    assert k != 0, 'HC sampling cannot be done in a class-equal manner'
+    if k == 0:
+        print('HC sampling cannot be done in a class-equal manner')
+        return []
     print("Filtering top {:d} elements per class".format(k))
 
     hc_idxs = []

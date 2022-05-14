@@ -329,6 +329,8 @@ def train_target(args):
             paws_cls_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.paws_cls_smooth)
 
     mem_label = None
+    hc_active = False
+    logs = {}
 
     while iter_num < max_iter:
 
@@ -341,31 +343,37 @@ def train_target(args):
             c, p, f, o = get_outputs(dset_loaders['cal'], netF, netH, netB, netC)
             hc_idxs = get_topk_conf_indices(c, p, n_classes=args.class_num, k=args.hc_topk, threshold=args.hc_threshold)
 
-            prev_topk = args.hc_topk
-            args.hc_topk = min(args.hc_topk + args.hc_topk_increase, args.hc_topk_max)
-            print('HC topk change', prev_topk, '->', args.hc_topk)
-            min_conf = np.min(p[hc_idxs])
-            if args.exclude_lc:
-                if args.reset_lc:
-                    tgt_dataset = copy.deepcopy(backup_dset)
-                tgt_dataset.exclude(hc_idxs)
-                dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size, shuffle=True,
-                                                    num_workers=args.worker, drop_last=True, pin_memory=True)
-                max_iter = args.max_epoch * len(dset_loaders["target"])
-                interval_iter = max_iter // args.interval
-                hc_interval_iter = max_iter // args.hc_interval
-                # iter_test = iter(dset_loaders["target"])
+            if len(hc_idxs) != 0:
+                print('HC set mined')
+                prev_topk = args.hc_topk
+                args.hc_topk = min(args.hc_topk + args.hc_topk_increase, args.hc_topk_max)
+                print('HC topk change', prev_topk, '->', args.hc_topk)
+                min_conf = np.min(p[hc_idxs])
+                if args.exclude_lc:
+                    if args.reset_lc:
+                        tgt_dataset = copy.deepcopy(backup_dset)
+                    tgt_dataset.exclude(hc_idxs)
+                    dset_loaders["target"] = DataLoader(tgt_dataset, batch_size=args.batch_size, shuffle=True,
+                                                        num_workers=args.worker, drop_last=True, pin_memory=True)
+                    max_iter = args.max_epoch * len(dset_loaders["target"])
+                    interval_iter = max_iter // args.interval
+                    hc_interval_iter = max_iter // args.hc_interval
+                    # iter_test = iter(dset_loaders["target"])
 
-            hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], transform=image_hc(args), idxs=hc_idxs)
-            hc_bsize = min(args.paws_batch_size, len(hc_set) // args.class_num)
-            hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize, args.class_num, seed=args.seed)
-            print('HC bsize is set to', hc_bsize)
+                hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], transform=image_hc(args), idxs=hc_idxs)
+                hc_bsize = min(args.paws_batch_size, len(hc_set) // args.class_num)
+                hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize, args.class_num, seed=args.seed)
+                print('HC bsize is set to', hc_bsize)
 
-            hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
+                hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
-            iter_hc = iter(hc_loader)
+                iter_hc = iter(hc_loader)
 
-            args.hc_threshold = min(args.hc_threshold + args.hc_threshold_increase, args.hc_threshold_max)
+                args.hc_threshold = min(args.hc_threshold + args.hc_threshold_increase, args.hc_threshold_max)
+                hc_active = True
+            else:
+                hc_active = False
+                print('HC set mining failed. Falling back to default learning..')
 
             eval_off = False
             if args.aug_pl == args.aug_cal:
@@ -380,7 +388,7 @@ def train_target(args):
             netH.train()
             netB.train()
 
-            if use_hc and args.sspl_agreement:
+            if use_hc and args.sspl_agreement and hc_active:
                 agree_idxs = np.where(pl == p)[0]
                 hc_idxs = np.where(c >= args.agreement_threshold)[0]
                 filter_idxs = np.intersect1d(agree_idxs, hc_idxs)
@@ -477,29 +485,7 @@ def train_target(args):
             else:
                 raise NotImplementedError
 
-        if args.cls_par > 0:
-            # with torch.no_grad():
-            #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
-            #    conf = conf.cpu().numpy()
-            conf_cls = mem_conf[tar_idx]
-
-            classifier_loss = cls_loss_fn(outputs_test[conf_cls >= args.conf_threshold],
-                                          pred[conf_cls >= args.conf_threshold])
-            if args.cls2:
-                classifier_loss += cls_loss_fn(c2[conf_cls >= args.conf_threshold],
-                                               pred[conf_cls >= args.conf_threshold])
-            if args.cls_scheduling in ['const', 'step']:
-                classifier_loss *= args.cls_par
-            elif args.cls_scheduling == 'linear':
-                classifier_loss *= (args.cls_par * iter_num / max_iter)
-            if iter_num < interval_iter * args.skip_multiplier and args.cls_scheduling == 'step':
-                classifier_loss *= 0
-        else:
-            classifier_loss = torch.tensor(0.0).cuda()
-
-        pl_loss = classifier_loss.item()
-
-        if True:
+        if hc_active:
             try:
                 inputs_hc, labels_hc, _ = iter_hc.next()
             except:
@@ -509,6 +495,7 @@ def train_target(args):
             inputs_hc = inputs_hc.cuda()
             b_hc = netB(netF(inputs_hc))
             c_hc = netC(b_hc, labels_forward)
+
             labels_hc = labels_hc.cuda()
             labels_hc_onehot = F.one_hot(labels_hc, num_classes=args.class_num) \
                                * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
@@ -560,59 +547,66 @@ def train_target(args):
                     elif args.mutate_to == 'second':
                         second_largest = torch.kthvalue(paws_p1, dim=1)[1].cuda()
                         pred[mut_idx] = second_largest[mut_idx]
-            classifier_loss = cls_loss_fn(outputs_test, pred)
 
+            if args.cls_weight != 0:
+                classifier_loss = args.cls_weight * cls_loss_fn(outputs_test, pred)
+                logs['kmeans'] = classifier_loss.item() / args.cls_weight
+            else:
+                classifier_loss = torch.tensor(0.0).cuda()
+
+            softmax_out = nn.Softmax(dim=1)(outputs_test)
+
+            if args.memax_weight != 0 and args.memax_mode != '':
+                memax_idx = torch.zeros_like(agree)
+                if 'ah' in args.memax_mode:
+                    memax_idx = torch.logical_or(memax_idx, ah)
+                if 'al' in args.memax_mode:
+                    memax_idx = torch.logical_or(memax_idx, al)
+                if 'dh' in args.memax_mode:
+                    memax_idx = torch.logical_or(memax_idx, dh)
+                if 'dl' in args.memax_mode:
+                    memax_idx = torch.logical_or(memax_idx, dl)
+                msoftmax = softmax_out[memax_idx].mean(dim=0)
+                me = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
+                classifier_loss -= args.memax_weight * me
+                logs['memax'] = me.item()
             if args.ce_hc:
-                classifier_loss += cls_loss_fn(c_hc, labels_hc)
-
+                ce_hc = cls_loss_fn(c_hc, labels_hc)
+                classifier_loss += ce_hc
+                logs['ce_hc'] = ce_hc.item()
             if args.minent_hc:
                 hc_softmax_out = nn.Softmax(dim=1)(c_hc)
                 paws_entropy_loss = torch.mean(loss.Entropy(hc_softmax_out))
                 classifier_loss += paws_entropy_loss
-            else:
-                paws_entropy_loss = torch.tensor(0.0).cuda()
+                logs['ent_hc'] = paws_entropy_loss.item()
 
-            softmax_out = nn.Softmax(dim=1)(outputs_test)
-
-            memax_idx = torch.zeros_like(agree)
-            if 'ah' in args.memax_mode:
-                memax_idx = torch.logical_or(memax_idx, ah)
-            if 'al' in args.memax_mode:
-                memax_idx = torch.logical_or(memax_idx, al)
-            if 'dh' in args.memax_mode:
-                memax_idx = torch.logical_or(memax_idx, dh)
-            if 'dl' in args.memax_mode:
-                memax_idx = torch.logical_or(memax_idx, dl)
-            if args.memax_mode != '':
-                msoftmax = softmax_out[memax_idx].mean(dim=0)
-                me = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
-                classifier_loss -= me
-
-            minent_idx = torch.zeros_like(agree)
-            if 'ah' in args.minent_mode:
-                minent_idx = torch.logical_or(minent_idx, ah)
-            if 'al' in args.minent_mode:
-                minent_idx = torch.logical_or(minent_idx, al)
-            if 'dh' in args.minent_mode:
-                minent_idx = torch.logical_or(minent_idx, dh)
-            if 'dl' in args.minent_mode:
-                minent_idx = torch.logical_or(minent_idx, dl)
-            if args.minent_mode != '':
+            if args.minent_weight != 0 and args.minent_mode != '':
+                minent_idx = torch.zeros_like(agree)
+                if 'ah' in args.minent_mode:
+                    minent_idx = torch.logical_or(minent_idx, ah)
+                if 'al' in args.minent_mode:
+                    minent_idx = torch.logical_or(minent_idx, al)
+                if 'dh' in args.minent_mode:
+                    minent_idx = torch.logical_or(minent_idx, dh)
+                if 'dl' in args.minent_mode:
+                    minent_idx = torch.logical_or(minent_idx, dl)
                 m_ent = torch.mean(loss.Entropy(softmax_out[minent_idx]))
                 classifier_loss += m_ent
+                logs['ment'] = m_ent.item()
 
-            maxent_idx = torch.zeros_like(agree)
-            if 'ah' in args.maxent_mode:
-                maxent_idx = torch.logical_or(maxent_idx, ah)
-            if 'al' in args.maxent_mode:
-                maxent_idx = torch.logical_or(maxent_idx, al)
-            if 'dh' in args.maxent_mode:
-                maxent_idx = torch.logical_or(maxent_idx, dh)
-            if 'dl' in args.maxent_mode:
-                maxent_idx = torch.logical_or(maxent_idx, dl)
-            if args.maxent_mode != '':
+            if args.maxent_weight != 0 and args.maxent_mode != '':
+                maxent_idx = torch.zeros_like(agree)
+                if 'ah' in args.maxent_mode:
+                    maxent_idx = torch.logical_or(maxent_idx, ah)
+                if 'al' in args.maxent_mode:
+                    maxent_idx = torch.logical_or(maxent_idx, al)
+                if 'dh' in args.maxent_mode:
+                    maxent_idx = torch.logical_or(maxent_idx, dh)
+                if 'dl' in args.maxent_mode:
+                    maxent_idx = torch.logical_or(maxent_idx, dl)
                 M_ent = torch.mean(loss.Entropy(softmax_out[maxent_idx]))
                 classifier_loss -= M_ent
+                logs['Ment'] = M_ent.item()
 
             if args.paws_weight != 0:
                 if args.paws_detach:
@@ -624,58 +618,93 @@ def train_target(args):
                 paws_p2 = snn(b1_detach, b_hc_detach, labels_hc_onehot, tau=args.paws_temp)
                 paws_loss = paws(paws_p1, paws_p2)
                 classifier_loss += args.paws_weight * paws_loss
-            else:
-                paws_loss = torch.tensor(0.0).cuda()
+                logs['PAWS'] = paws_loss.item()
 
-            if args.paws_cls_weight != 0 and disagree.sum().item() != 0:
+            if args.paws_cls_weight != 0 and args.paws_cls_mode != '':
+                paws_cls_idx = torch.zeros_like(agree)
+                if 'ah' in args.paws_cls_mode:
+                    paws_cls_idx = torch.logical_or(paws_cls_idx, ah)
+                if 'al' in args.paws_cls_mode:
+                    paws_cls_idx = torch.logical_or(paws_cls_idx, al)
+                if 'dh' in args.paws_cls_mode:
+                    paws_cls_idx = torch.logical_or(paws_cls_idx, dh)
+                if 'dl' in args.paws_cls_mode:
+                    paws_cls_idx = torch.logical_or(paws_cls_idx, dl)
+
                 if args.soft_paws_cls:
                     if args.paws_cls_detach:
-                        paws_p = paws_p1[disagree].detach()
+                        paws_p = paws_p1[paws_cls_idx].detach()
                     else:
-                        paws_p = paws_p1[disagree]
+                        paws_p = paws_p1[paws_cls_idx]
                     if args.sharpen_paws_p:
-                        paws_p = sharpen(paws_p[disagree])
-                    paws_cls = F.binary_cross_entropy_with_logits(outputs_test[disagree], paws_p, reduction='mean')
+                        paws_p = sharpen(paws_p[paws_cls_idx])
+                    paws_cls = F.binary_cross_entropy_with_logits(outputs_test[paws_cls_idx], paws_p, reduction='mean')
                 else:
-                    _, paws_pl = torch.max(paws_p1[disagree].detach(), dim=1)
-                    paws_cls = paws_cls_fn(outputs_test[disagree], paws_pl)
+                    _, paws_pl = torch.max(paws_p1[paws_cls_idx].detach(), dim=1)
+                    paws_cls = paws_cls_fn(outputs_test[paws_cls_idx], paws_pl)
 
                 classifier_loss += args.paws_weight * paws_cls
-            else:
-                paws_cls = torch.tensor(0.0).cuda()
+                logs['PAWScls'] = paws_cls.item()
 
-            if args.paws_cr_weight != 0 and disagree.sum().item() != 0:
+            if args.paws_cr_weight != 0 and args.paws_cr_mode != '':
                 # with torch.no_grad():
                 #    sspl_onehot = F.one_hot(pred, num_classes=args.class_num) \
                 #                       * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
                 # paws_cr = dist(paws_p1, sspl_onehot)
-                paws_cr = paws_cls_fn(paws_p1[disagree], pred[disagree])
+                paws_cr_idx = torch.zeros_like(agree)
+                if 'ah' in args.paws_cr_mode:
+                    paws_cr_idx = torch.logical_or(paws_cr_idx, ah)
+                if 'al' in args.paws_cr_mode:
+                    paws_cr_idx = torch.logical_or(paws_cr_idx, al)
+                if 'dh' in args.paws_cr_mode:
+                    paws_cr_idx = torch.logical_or(paws_cr_idx, dh)
+                if 'dl' in args.paws_cr_mode:
+                    paws_cr_idx = torch.logical_or(paws_cr_idx, dl)
+                paws_cr = paws_cls_fn(paws_p1[paws_cr_idx], pred[paws_cr_idx])
                 classifier_loss += args.paws_cr_weight * paws_cr
+                logs['PAWScr'] = paws_cr.item()
+        else:
+            if args.cls_weight != 0:
+                # with torch.no_grad():
+                #    conf, _ = torch.max(F.softmax(outputs_test, dim=-1), dim=-1)
+                #    conf = conf.cpu().numpy()
+                conf_cls = mem_conf[tar_idx]
+
+                classifier_loss = cls_loss_fn(outputs_test[conf_cls >= args.conf_threshold],
+                                              pred[conf_cls >= args.conf_threshold])
+                if args.cls2:
+                    classifier_loss += cls_loss_fn(c2[conf_cls >= args.conf_threshold],
+                                                   pred[conf_cls >= args.conf_threshold])
+                if args.cls_scheduling in ['const', 'step']:
+                    classifier_loss *= args.cls_weight
+                elif args.cls_scheduling == 'linear':
+                    classifier_loss *= (args.cls_weight * iter_num / max_iter)
+                if iter_num < interval_iter * args.skip_multiplier and args.cls_scheduling == 'step':
+                    classifier_loss *= 0
+                logs['kmeans'] = classifier_loss.item() / args.cls_weight
             else:
-                paws_cr = torch.tensor(0.0).cuda()
+                classifier_loss = torch.tensor(0.0).cuda()
 
-        if args.ent_par > 0:
-            softmax_out = nn.Softmax(dim=1)(outputs_test)
-            entropy_loss = torch.mean(loss.Entropy(softmax_out))
-            if args.minent_scheduling in ['const', 'step']:
-                im_loss = entropy_loss * args.ent_par
-            elif args.minent_scheduling == 'linear':
-                im_loss = entropy_loss * args.ent_par * iter_num / max_iter
-            if iter_num < interval_iter * args.skip_multiplier and args.minent_scheduling == 'step':
-                im_loss *= 0
-            classifier_loss += im_loss
-        else:
-            im_loss = torch.tensor(0.0).cuda()
+            if args.minent_weight != 0:
+                softmax_out = nn.Softmax(dim=1)(outputs_test)
+                entropy_loss = torch.mean(loss.Entropy(softmax_out))
+                if args.minent_scheduling in ['const', 'step']:
+                    im_loss = entropy_loss * args.minent_weight
+                elif args.minent_scheduling == 'linear':
+                    im_loss = entropy_loss * args.minent_weight * iter_num / max_iter
+                if iter_num < interval_iter * args.skip_multiplier and args.minent_scheduling == 'step':
+                    im_loss *= 0
+                logs['ment'] = im_loss.item() / args.minent_weight
+                classifier_loss += im_loss
 
-        if args.gent_par > 0:
-            softmax_out = nn.Softmax(dim=1)(outputs_test)
-            msoftmax = softmax_out.mean(dim=0)
-            gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
-            classifier_loss -= args.gent_par * gentropy_loss
-        else:
-            gentropy_loss = torch.tensor(0.0).cuda()
+            if args.memax_weight > 0:
+                softmax_out = nn.Softmax(dim=1)(outputs_test)
+                msoftmax = softmax_out.mean(dim=0)
+                gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
+                classifier_loss -= args.memax_weight * gentropy_loss
+                logs['Ment'] = gentropy_loss.item()
 
-        if args.cr_weight > 0:
+        if args.cr_weight != 0:
             try:
                 if args.sg2_cr and not args.sg2:
                     cr_loss = dist(f_hard[conf1 >= args.cr_threshold], f_weak.detach()[conf1 >= args.cr_threshold]).mean()
@@ -696,6 +725,7 @@ def train_target(args):
                     pass
                 else:
                     classifier_loss += args.cr_weight * cr_loss
+            logs['cr'] = cr_loss.item()
 
         optimizer.zero_grad()
         classifier_loss.backward()
@@ -706,22 +736,19 @@ def train_target(args):
             netH.eval()
             netB.eval()
             print(len(hc_set.idxs), 'samples are in HC set')
-            print(
-                'KMEANS: {:.3f} PAWS: {:.3f} Ent: {:.3f} CLS: {:.3f} CR: {:.3f} Ent: {:.3f} ME: {:.3f}'.format(pl_loss,
-                                                                                                               paws_loss.item(),
-                                                                                                               paws_entropy_loss.item(),
-                                                                                                               paws_cls.item(),
-                                                                                                               paws_cr.item(),
-                                                                                                               im_loss.item(),
-                                                                                                               gentropy_loss.item()))
+
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter,
-                                                                            acc_s_te) + '\n' + acc_list
+                                                                            acc_s_te) + '\n' + acc_list + '\n'
             else:
                 acc_s_te, _ = cal_acc(dset_loaders['test'], netF, netH, netB, netC, False)
-                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter, acc_s_te)
+                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter, acc_s_te) + '\n'
 
+            for k, v in logs.items():
+                log_str += k + ' {:.3f}'.format(v) + ', '
+
+            logs = {}
             args.out_file.write(log_str + '\n')
             args.out_file.flush()
             print(log_str + '\n')
@@ -986,10 +1013,10 @@ if __name__ == "__main__":
     parser.add_argument('--nogent', action='store_true')
     parser.add_argument('--noent', action='store_true')
     parser.add_argument('--threshold', type=int, default=0)
-    parser.add_argument('--cls_par', type=float, default=0.3)
+    parser.add_argument('--cls_weight', type=float, default=0.3)
     parser.add_argument('--cls_smooth', type=float, default=0)
-    parser.add_argument('--ent_par', type=float, default=0.0)
-    parser.add_argument('--gent_par', type=float, default=1.0)
+    parser.add_argument('--minent_weight', type=float, default=0.0)
+    parser.add_argument('--memax_weight', type=float, default=1.0)
     parser.add_argument('--lr_decay1', type=float, default=0.1)
     parser.add_argument('--lr_decay2', type=float, default=1.0)
 
@@ -1138,6 +1165,8 @@ if __name__ == "__main__":
     parser.add_argument('--memax_mode', type=str, default='ahaldhdl')
     parser.add_argument('--ce_hc', type=str2bool, default=False)
     parser.add_argument('--minent_hc', type=str2bool, default=False)
+    parser.add_argument('--paws_cls_mode', type=str, default='')
+    parser.add_argument('--paws_cr_mode', type=str, default='')
 
     args = parser.parse_args()
 
@@ -1241,10 +1270,10 @@ if __name__ == "__main__":
             if not osp.exists(args.output_dir):
                 os.mkdir(args.output_dir)
 
-            args.savename = 'par_' + str(args.cls_par)
+            args.savename = 'par_' + str(args.cls_weight)
             if args.da == 'pda':
                 args.gent = ''
-                args.savename = 'par_' + str(args.cls_par) + '_thr' + str(args.threshold)
+                args.savename = 'par_' + str(args.cls_weight) + '_thr' + str(args.threshold)
             args.out_file = open(osp.join(args.output_dir, 'log_' + args.savename + '.txt'), 'w')
             args.out_file.write(print_args(args) + '\n')
             args.out_file.flush()
