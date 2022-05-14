@@ -545,7 +545,7 @@ def train_target(args):
                     if args.mutate_to == 'random':
                         pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
                     elif args.mutate_to == 'second':
-                        second_largest = torch.kthvalue(paws_p1, 2, dim=1)[1].cuda()
+                        second_largest = torch.kthvalue(paws_p1, k=2, dim=1)[1].cuda()
                         pred[mut_idx] = second_largest[mut_idx]
 
             if args.cls_weight != 0:
