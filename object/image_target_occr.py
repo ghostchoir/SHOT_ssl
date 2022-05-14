@@ -545,12 +545,15 @@ def train_target(args):
                       dl.sum().item(), dl_correct.sum().item(), dl_correct_paws.sum().item())
 
             if random.random() <= args.label_mutate_p and dl.sum().item() > 0:
-                if args.mutate_mode == 'dl':
-                    mut_idx = dl
-                elif args.mutate_mode == 'd':
-                    mut_idx = disagree
-                elif args.mutate_mode == 'dal':
-                    mut_idx = torch.logical_or(disagree, al)
+                mut_idx = torch.zeros_like(agree)
+                if 'ah' in args.memax_mode:
+                    mut_idx = torch.logical_or(mut_idx, ah)
+                if 'al' in args.memax_mode:
+                    mut_idx = torch.logical_or(mut_idx, al)
+                if 'dh' in args.memax_mode:
+                    mut_idx = torch.logical_or(mut_idx, dh)
+                if 'dl' in args.memax_mode:
+                    mut_idx = torch.logical_or(mut_idx, dl)
                 pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
             classifier_loss = cls_loss_fn(outputs_test, pred)
 
@@ -565,31 +568,44 @@ def train_target(args):
                 paws_entropy_loss = torch.tensor(0.0).cuda()
 
             softmax_out = nn.Softmax(dim=1)(outputs_test)
-            if args.memax_mode == 'all':
-                memax_idx = torch.logical_or(agree, disagree)
-            elif args.memax_mode == 'd':
-                memax_idx = disagree
-            elif args.memax_mode == 'dl':
-                memax_idx = dl
-            elif args.memax_mode == 'l':
-                memax_idx = lc
+
+            memax_idx = torch.zeros_like(agree)
+            if 'ah' in args.memax_mode:
+                memax_idx = torch.logical_or(memax_idx, ah)
+            if 'al' in args.memax_mode:
+                memax_idx = torch.logical_or(memax_idx, al)
+            if 'dh' in args.memax_mode:
+                memax_idx = torch.logical_or(memax_idx, dh)
+            if 'dl' in args.memax_mode:
+                memax_idx = torch.logical_or(memax_idx, dl)
             msoftmax = softmax_out[memax_idx].mean(dim=0)
 
-            if args.minent_mode == 'all':
-                minent_idx = torch.logical_or(agree, disagree)
-            elif args.minent_mode == 'a':
-                minent_idx = agree
-            elif args.minent_mode == 'ah':
-                minent_idx = ah
-            elif args.minent_mode == 'adh':
-                minent_idx = torch.logical_or(agree, dh)
-            elif args.minent_mode == 'h':
-                minent_idx = hc
-            a_ent = torch.mean(loss.Entropy(softmax_out[minent_idx]))
-            classifier_loss += a_ent
+            minent_idx = torch.zeros_like(agree)
+            if 'ah' in args.memax_mode:
+                minent_idx = torch.logical_or(minent_idx, ah)
+            if 'al' in args.memax_mode:
+                minent_idx = torch.logical_or(minent_idx, al)
+            if 'dh' in args.memax_mode:
+                minent_idx = torch.logical_or(minent_idx, dh)
+            if 'dl' in args.memax_mode:
+                minent_idx = torch.logical_or(minent_idx, dl)
+            m_ent = torch.mean(loss.Entropy(softmax_out[minent_idx]))
+            classifier_loss += m_ent
 
-            d_me = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
-            classifier_loss -= d_me
+            maxent_idx = torch.zeros_like(agree)
+            if 'ah' in args.memax_mode:
+                maxent_idx = torch.logical_or(maxent_idx, ah)
+            if 'al' in args.memax_mode:
+                maxent_idx = torch.logical_or(maxent_idx, al)
+            if 'dh' in args.memax_mode:
+                maxent_idx = torch.logical_or(maxent_idx, dh)
+            if 'dl' in args.memax_mode:
+                maxent_idx = torch.logical_or(maxent_idx, dl)
+            M_ent = torch.mean(loss.Entropy(softmax_out[maxent_idx]))
+            classifier_loss -= M_ent
+
+            me = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
+            classifier_loss -= me
 
             if args.paws_weight != 0:
                 if args.paws_detach:
@@ -1108,9 +1124,10 @@ if __name__ == "__main__":
     parser.add_argument('--full_logging', type=str2bool, default=True)
     parser.add_argument('--label_mutate_p', type=float, default=0.0)
     parser.add_argument('--mutate_p_delta', type=float, default=0)
-    parser.add_argument('--mutate_mode', type=str, default='dl', choices=['dl', 'd', 'dal'])
-    parser.add_argument('--minent_mode', type=str, default='all', choices=['all', 'adh', 'a', 'ah', 'h'])
-    parser.add_argument('--memax_mode', type=str, default='all', choices=['all', 'd', 'dl', 'l'])
+    parser.add_argument('--mutate_mode', type=str, default='ahaldhdl')
+    parser.add_argument('--maxent_mode', type=str, default='ahaldhdl')
+    parser.add_argument('--minent_mode', type=str, default='ahaldhdl')
+    parser.add_argument('--memax_mode', type=str, default='ahaldhdl')
     parser.add_argument('--ce_hc', type=str2bool, default=False)
     parser.add_argument('--minent_hc', type=str2bool, default=False)
 
