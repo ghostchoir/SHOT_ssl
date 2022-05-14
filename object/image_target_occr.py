@@ -1160,6 +1160,7 @@ if __name__ == "__main__":
     parser.add_argument('--mutate_p_delta', type=float, default=0)
     parser.add_argument('--mutate_mode', type=str, default='dhdl')
     parser.add_argument('--mutate_to', type=str, default='random', choices=['random', 'second', 'top3'])
+    parser.add_argument('--maxent_weight', type=float, default=0.0)
     parser.add_argument('--maxent_mode', type=str, default='')
     parser.add_argument('--minent_mode', type=str, default='ahaldhdl')
     parser.add_argument('--memax_mode', type=str, default='ahaldhdl')
