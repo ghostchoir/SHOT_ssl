@@ -554,7 +554,12 @@ def train_target(args):
                     mut_idx = torch.logical_or(mut_idx, dh)
                 if 'dl' in args.memax_mode:
                     mut_idx = torch.logical_or(mut_idx, dl)
-                pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
+
+                if args.mutate_to == 'random':
+                    pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
+                elif args.mutate_to == 'second':
+                    second_largest = torch.kthvalue(paws_p1, dim=1)[1].cuda()
+                    pred[mut_idx] = second_largest[mut_idx]
             classifier_loss = cls_loss_fn(outputs_test, pred)
 
             if args.ce_hc:
@@ -1125,6 +1130,7 @@ if __name__ == "__main__":
     parser.add_argument('--label_mutate_p', type=float, default=0.0)
     parser.add_argument('--mutate_p_delta', type=float, default=0)
     parser.add_argument('--mutate_mode', type=str, default='ahaldhdl')
+    parser.add_argument('--mutate_to', type=str, default='random', choices=['random', 'second', 'top3'])
     parser.add_argument('--maxent_mode', type=str, default='ahaldhdl')
     parser.add_argument('--minent_mode', type=str, default='ahaldhdl')
     parser.add_argument('--memax_mode', type=str, default='ahaldhdl')
