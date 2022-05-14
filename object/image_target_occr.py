@@ -546,20 +546,20 @@ def train_target(args):
 
             if random.random() <= args.label_mutate_p and dl.sum().item() > 0:
                 mut_idx = torch.zeros_like(agree)
-                if 'ah' in args.memax_mode:
+                if 'ah' in args.mutate_mode:
                     mut_idx = torch.logical_or(mut_idx, ah)
-                if 'al' in args.memax_mode:
+                if 'al' in args.mutate_mode:
                     mut_idx = torch.logical_or(mut_idx, al)
-                if 'dh' in args.memax_mode:
+                if 'dh' in args.mutate_mode:
                     mut_idx = torch.logical_or(mut_idx, dh)
-                if 'dl' in args.memax_mode:
+                if 'dl' in args.mutate_mode:
                     mut_idx = torch.logical_or(mut_idx, dl)
-
-                if args.mutate_to == 'random':
-                    pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
-                elif args.mutate_to == 'second':
-                    second_largest = torch.kthvalue(paws_p1, dim=1)[1].cuda()
-                    pred[mut_idx] = second_largest[mut_idx]
+                if args.mutate_mode != '':
+                    if args.mutate_to == 'random':
+                        pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
+                    elif args.mutate_to == 'second':
+                        second_largest = torch.kthvalue(paws_p1, dim=1)[1].cuda()
+                        pred[mut_idx] = second_largest[mut_idx]
             classifier_loss = cls_loss_fn(outputs_test, pred)
 
             if args.ce_hc:
@@ -583,34 +583,36 @@ def train_target(args):
                 memax_idx = torch.logical_or(memax_idx, dh)
             if 'dl' in args.memax_mode:
                 memax_idx = torch.logical_or(memax_idx, dl)
-            msoftmax = softmax_out[memax_idx].mean(dim=0)
+            if args.memax_mode != '':
+                msoftmax = softmax_out[memax_idx].mean(dim=0)
+                me = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
+                classifier_loss -= me
 
             minent_idx = torch.zeros_like(agree)
-            if 'ah' in args.memax_mode:
+            if 'ah' in args.minent_mode:
                 minent_idx = torch.logical_or(minent_idx, ah)
-            if 'al' in args.memax_mode:
+            if 'al' in args.minent_mode:
                 minent_idx = torch.logical_or(minent_idx, al)
-            if 'dh' in args.memax_mode:
+            if 'dh' in args.minent_mode:
                 minent_idx = torch.logical_or(minent_idx, dh)
-            if 'dl' in args.memax_mode:
+            if 'dl' in args.minent_mode:
                 minent_idx = torch.logical_or(minent_idx, dl)
-            m_ent = torch.mean(loss.Entropy(softmax_out[minent_idx]))
-            classifier_loss += m_ent
+            if args.minent_mode != '':
+                m_ent = torch.mean(loss.Entropy(softmax_out[minent_idx]))
+                classifier_loss += m_ent
 
             maxent_idx = torch.zeros_like(agree)
-            if 'ah' in args.memax_mode:
+            if 'ah' in args.maxent_mode:
                 maxent_idx = torch.logical_or(maxent_idx, ah)
-            if 'al' in args.memax_mode:
+            if 'al' in args.maxent_mode:
                 maxent_idx = torch.logical_or(maxent_idx, al)
-            if 'dh' in args.memax_mode:
+            if 'dh' in args.maxent_mode:
                 maxent_idx = torch.logical_or(maxent_idx, dh)
-            if 'dl' in args.memax_mode:
+            if 'dl' in args.maxent_mode:
                 maxent_idx = torch.logical_or(maxent_idx, dl)
-            M_ent = torch.mean(loss.Entropy(softmax_out[maxent_idx]))
-            classifier_loss -= M_ent
-
-            me = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
-            classifier_loss -= me
+            if args.maxent_mode != '':
+                M_ent = torch.mean(loss.Entropy(softmax_out[maxent_idx]))
+                classifier_loss -= M_ent
 
             if args.paws_weight != 0:
                 if args.paws_detach:
@@ -1129,9 +1131,9 @@ if __name__ == "__main__":
     parser.add_argument('--full_logging', type=str2bool, default=True)
     parser.add_argument('--label_mutate_p', type=float, default=0.0)
     parser.add_argument('--mutate_p_delta', type=float, default=0)
-    parser.add_argument('--mutate_mode', type=str, default='ahaldhdl')
+    parser.add_argument('--mutate_mode', type=str, default='dhdl')
     parser.add_argument('--mutate_to', type=str, default='random', choices=['random', 'second', 'top3'])
-    parser.add_argument('--maxent_mode', type=str, default='ahaldhdl')
+    parser.add_argument('--maxent_mode', type=str, default='')
     parser.add_argument('--minent_mode', type=str, default='ahaldhdl')
     parser.add_argument('--memax_mode', type=str, default='ahaldhdl')
     parser.add_argument('--ce_hc', type=str2bool, default=False)
