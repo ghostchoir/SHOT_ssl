@@ -581,6 +581,8 @@ def train_target(args):
                 minent_idx = agree
             elif args.minent_mode == 'ah':
                 minent_idx = ah
+            elif args.minent_mode == 'adh':
+                minent_idx = torch.logical_or(agree, dh)
             elif args.minent_mode == 'h':
                 minent_idx = hc
             a_ent = torch.mean(loss.Entropy(softmax_out[minent_idx]))
@@ -1107,7 +1109,7 @@ if __name__ == "__main__":
     parser.add_argument('--label_mutate_p', type=float, default=0.0)
     parser.add_argument('--mutate_p_delta', type=float, default=0)
     parser.add_argument('--mutate_mode', type=str, default='dl', choices=['dl', 'd', 'dal'])
-    parser.add_argument('--minent_mode', type=str, default='all', choices=['all', 'a', 'ah', 'h'])
+    parser.add_argument('--minent_mode', type=str, default='all', choices=['all', 'adh', 'a', 'ah', 'h'])
     parser.add_argument('--memax_mode', type=str, default='all', choices=['all', 'd', 'dl', 'l'])
     parser.add_argument('--ce_hc', type=str2bool, default=False)
     parser.add_argument('--minent_hc', type=str2bool, default=False)
