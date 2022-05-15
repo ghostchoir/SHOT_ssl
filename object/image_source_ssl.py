@@ -171,8 +171,9 @@ def data_load(args):
         if args.class_stratified:
             from paws import ClassStratifiedSampler
             dsets["source_tr"] = ImageList_update(tr_txt, transform=image_train(args))
-            sampler = ClassStratifiedSampler(dsets["source_tr"], 1, 0, args.per_class_batch_size,
-                                             args.class_num, seed=args.seed)
+            sampler = ClassStratifiedSampler(dsets["source_tr"], 1, 0, args.per_class_batch_size, args.class_num,
+                                             epochs=len(dsets["source_tr"]) // (args.per_class_batch_size * args.class_num),
+                                             seed=args.seed)
             dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_sampler=sampler, num_workers=args.worker,
                                                    shuffle=False)
         else:
