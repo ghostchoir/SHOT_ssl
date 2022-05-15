@@ -404,6 +404,7 @@ def train_source(args):
         try:
             inputs_source, labels_source = iter_source.next()
         except:
+            print('DataLoader reloaded')
             iter_source = iter(dset_loaders["source_tr"])
             inputs_source, labels_source = iter_source.next()
 

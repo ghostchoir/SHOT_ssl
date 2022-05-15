@@ -545,7 +545,7 @@ def train_target(args):
                     if args.mutate_to == 'random':
                         pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
                     elif args.mutate_to == 'second':
-                        second_largest = torch.kthvalue(paws_p1, dim=1)[1].cuda()
+                        second_largest = torch.kthvalue(paws_p1, k=2, dim=1)[1].cuda()
                         pred[mut_idx] = second_largest[mut_idx]
 
             if args.cls_weight != 0:
@@ -735,7 +735,10 @@ def train_target(args):
             netF.eval()
             netH.eval()
             netB.eval()
-            print(len(hc_set.idxs), 'samples are in HC set')
+            try:
+                print(len(hc_set.idxs), 'samples are in HC set')
+            except:
+                pass
 
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
