@@ -763,7 +763,7 @@ if __name__ == "__main__":
     parser.add_argument('--separate_wd', type=str2bool, default=False)
 
     parser.add_argument('--ent_weight', type=float, default=0)
-    parser.add_argument('--gent_weight', type=float, default=1.0)
+    parser.add_argument('--gent_weight', type=float, default=0)
 
     parser.add_argument('--class_stratified', type=str2bool, default=False)
     parser.add_argument('--per_class_batch_size', type=int, default=6)
