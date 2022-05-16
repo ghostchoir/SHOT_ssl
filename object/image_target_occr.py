@@ -531,7 +531,7 @@ def train_target(args):
                       dh.sum().item(), dh_correct.sum().item(), dh_correct_paws.sum().item(), '\nDL',
                       dl.sum().item(), dl_correct.sum().item(), dl_correct_paws.sum().item())
 
-            if random.random() <= args.label_mutate_p and dl.sum().item() > 0:
+            if random.random() <= args.label_mutate_p and args.mutate_mode != '':
                 mut_idx = torch.zeros_like(agree)
                 if 'ah' in args.mutate_mode:
                     mut_idx = torch.logical_or(mut_idx, ah)
@@ -541,12 +541,13 @@ def train_target(args):
                     mut_idx = torch.logical_or(mut_idx, dh)
                 if 'dl' in args.mutate_mode:
                     mut_idx = torch.logical_or(mut_idx, dl)
-                if args.mutate_mode != '':
-                    if args.mutate_to == 'random':
-                        pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
-                    elif args.mutate_to == 'second':
-                        second_largest = torch.kthvalue(paws_p1, k=2, dim=1)[1].cuda()
-                        pred[mut_idx] = second_largest[mut_idx]
+                if torch.count_nonzero(mut_idx) > 0:
+                    if args.mutate_mode != '':
+                        if args.mutate_to == 'random':
+                            pred[mut_idx] = torch.randint(low=0, high=args.class_num, size=pred[mut_idx].size()).cuda()
+                        elif args.mutate_to == 'second':
+                            second_largest = torch.kthvalue(paws_p1, k=2, dim=1)[1].cuda()
+                            pred[mut_idx] = second_largest[mut_idx]
 
             if args.cls_weight != 0:
                 classifier_loss = args.cls_weight * cls_loss_fn(outputs_test, pred)
@@ -631,17 +632,20 @@ def train_target(args):
                 if 'dl' in args.paws_cls_mode:
                     paws_cls_idx = torch.logical_or(paws_cls_idx, dl)
 
-                if args.soft_paws_cls:
-                    if args.paws_cls_detach:
-                        paws_p = paws_p1[paws_cls_idx].detach()
+                if torch.count_nonzero(paws_cls_idx) > 0:
+                    if args.soft_paws_cls:
+                        if args.paws_cls_detach:
+                            paws_p = paws_p1[paws_cls_idx].detach()
+                        else:
+                            paws_p = paws_p1[paws_cls_idx]
+                        if args.sharpen_paws_p:
+                            paws_p = sharpen(paws_p[paws_cls_idx])
+                        paws_cls = F.binary_cross_entropy_with_logits(outputs_test[paws_cls_idx], paws_p, reduction='mean')
                     else:
-                        paws_p = paws_p1[paws_cls_idx]
-                    if args.sharpen_paws_p:
-                        paws_p = sharpen(paws_p[paws_cls_idx])
-                    paws_cls = F.binary_cross_entropy_with_logits(outputs_test[paws_cls_idx], paws_p, reduction='mean')
+                        _, paws_pl = torch.max(paws_p1[paws_cls_idx].detach(), dim=1)
+                        paws_cls = paws_cls_fn(outputs_test[paws_cls_idx], paws_pl)
                 else:
-                    _, paws_pl = torch.max(paws_p1[paws_cls_idx].detach(), dim=1)
-                    paws_cls = paws_cls_fn(outputs_test[paws_cls_idx], paws_pl)
+                    paws_cls = torch.tensor(0.0).cuda()
 
                 classifier_loss += args.paws_weight * paws_cls
                 logs['PAWScls'] = paws_cls.item()
@@ -660,7 +664,10 @@ def train_target(args):
                     paws_cr_idx = torch.logical_or(paws_cr_idx, dh)
                 if 'dl' in args.paws_cr_mode:
                     paws_cr_idx = torch.logical_or(paws_cr_idx, dl)
-                paws_cr = paws_cls_fn(paws_p1[paws_cr_idx], pred[paws_cr_idx])
+                if torch.count_nonzero(paws_cr_idx) > 0:
+                    paws_cr = paws_cls_fn(paws_p1[paws_cr_idx], pred[paws_cr_idx])
+                else:
+                    paws_cr = torch.tensor(0.0).cuda()
                 classifier_loss += args.paws_cr_weight * paws_cr
                 logs['PAWScr'] = paws_cr.item()
         else:
