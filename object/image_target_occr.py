@@ -680,6 +680,10 @@ def train_target(args):
                     paws_cr = paws_cls_fn(paws_p1[paws_cr_idx], pred[paws_cr_idx])
                 else:
                     paws_cr = torch.tensor(0.0).cuda()
+                if args.minent_scheduling in ['const', 'step']:
+                    paws_cr = paws_cr * args.paws_cr_weight
+                if iter_num < interval_iter * args.skip_multiplier and args.paws_cr_scheduling == 'step':
+                    paws_cr *= 0
                 classifier_loss += args.paws_cr_weight * paws_cr
                 logs['PAWScr'] = paws_cr.item()
         else:
@@ -1190,6 +1194,7 @@ if __name__ == "__main__":
     parser.add_argument('--minent_hc', type=str2bool, default=False)
     parser.add_argument('--paws_cls_mode', type=str, default='')
     parser.add_argument('--paws_cr_mode', type=str, default='')
+    parser.add_argument('--paws_cr_scheduling', type=str, default='const', choices=['const', 'step'])
 
     args = parser.parse_args()
 
