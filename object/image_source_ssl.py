@@ -352,7 +352,10 @@ def train_source(args):
     optimizer = op_copy(optimizer)
 
     acc_init = 0
-    max_iter = args.max_epoch * len(dset_loaders["source_tr"])
+    if args.class_stratified:
+        max_iter = args.max_epoch * len(dset_loaders["source_tr"].batch_sampler)
+    else:
+        max_iter = args.max_epoch * len(dset_loaders["source_tr"])
     interval_iter = max_iter // 10
     iter_num = 0
     epoch = 0
