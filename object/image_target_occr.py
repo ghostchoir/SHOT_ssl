@@ -592,8 +592,14 @@ def train_target(args):
                 if 'dl' in args.minent_mode:
                     minent_idx = torch.logical_or(minent_idx, dl)
                 m_ent = torch.mean(loss.Entropy(softmax_out[minent_idx]))
+                if args.minent_scheduling in ['const', 'step']:
+                    m_ent = m_ent * args.minent_weight
+                elif args.minent_scheduling == 'linear':
+                    m_ent = m_ent * args.minent_weight * iter_num / max_iter
+                if iter_num < interval_iter * args.skip_multiplier and args.minent_scheduling == 'step':
+                    m_ent *= 0
                 classifier_loss += m_ent
-                logs['ment'] = m_ent.item()
+                logs['ment'] = m_ent.item() / args.minent_weight
 
             if args.maxent_weight != 0 and args.maxent_mode != '':
                 maxent_idx = torch.zeros_like(agree)
