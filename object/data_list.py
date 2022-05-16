@@ -195,6 +195,8 @@ class ImageList_update(Dataset):
         for t in self.classes:
             indices = np.squeeze(np.argwhere(
                 self.targets == t)).tolist()
+            if type(indices) != list:
+                indices = [indices]
             self.target_indices.append(indices)
 
         self.transform = transform
