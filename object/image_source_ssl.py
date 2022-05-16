@@ -150,6 +150,9 @@ def data_load(args):
             tr_size = int(args.split_ratio * dsize)
             # print(dsize, tr_size, dsize - tr_size)
             tr_txt, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
+        elif args.trte == "nosplit":
+            tr_txt = txt_src
+            te_txt = txt_src
         else:
             dsize = len(txt_src)
             tr_size = int(args.split_ratio * dsize)
@@ -706,7 +709,7 @@ if __name__ == "__main__":
     parser.add_argument('--smooth', type=float, default=0.1)
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda', 'oda'])
-    parser.add_argument('--trte', type=str, default='val', choices=['full', 'val'])
+    parser.add_argument('--trte', type=str, default='val', choices=['full', 'val', 'nosplit'])
     parser.add_argument('--ssl_task', type=str, default='crsc',
                         choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc', 'crs'])
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
