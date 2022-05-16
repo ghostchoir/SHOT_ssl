@@ -684,8 +684,8 @@ def train_target(args):
                     paws_cr = paws_cr * args.paws_cr_weight
                 if iter_num < interval_iter * args.skip_multiplier and args.paws_cr_scheduling == 'step':
                     paws_cr *= 0
-                classifier_loss += args.paws_cr_weight * paws_cr
-                logs['PAWScr'] = paws_cr.item()
+                classifier_loss += paws_cr
+                logs['PAWScr'] = paws_cr.item() / args.paws_cr_weight
         else:
             if args.cls_weight != 0:
                 # with torch.no_grad():
