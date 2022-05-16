@@ -550,7 +550,13 @@ def train_target(args):
                             pred[mut_idx] = second_largest[mut_idx]
 
             if args.cls_weight != 0:
-                classifier_loss = args.cls_weight * cls_loss_fn(outputs_test, pred)
+                classifier_loss = cls_loss_fn(outputs_test, pred)
+                if args.cls_scheduling in ['const', 'step']:
+                    classifier_loss *= args.cls_weight
+                elif args.cls_scheduling == 'linear':
+                    classifier_loss *= (args.cls_weight * iter_num / max_iter)
+                if iter_num < interval_iter * args.skip_multiplier and args.cls_scheduling == 'step':
+                    classifier_loss *= 0
                 logs['kmeans'] = classifier_loss.item() / args.cls_weight
             else:
                 classifier_loss = torch.tensor(0.0).cuda()
