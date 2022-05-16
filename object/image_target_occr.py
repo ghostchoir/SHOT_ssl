@@ -709,7 +709,7 @@ def train_target(args):
                 msoftmax = softmax_out.mean(dim=0)
                 gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
                 classifier_loss -= args.memax_weight * gentropy_loss
-                logs['Ment'] = gentropy_loss.item()
+                logs['memax'] = gentropy_loss.item()
 
         if args.cr_weight != 0:
             try:
