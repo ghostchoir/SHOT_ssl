@@ -522,7 +522,10 @@ def train_target(args):
             labels_hc_onehot += (1 / args.class_num) * args.paws_smoothing
 
             # b3: (b_x, d_b) | b_hc: (b_hc, d_b) | labels_hc_onehot: (b_hc, n_c) => (b_x, n_c)
-            paws_p1 = snn(b2, b_hc, labels_hc_onehot, tau=args.paws_temp)
+            if args.paws_path == 1:
+                paws_p1 = snn(b2, b_hc, labels_hc_onehot, tau=args.paws_temp)
+            elif args.paws_path == 0:
+                paws_p1 = snn(b1, b_hc, labels_hc_onehot, tau=args.paws_temp)
 
             gt = torch.from_numpy(gt_labels[tar_idx])
             _, paws_pred = torch.max(paws_p1, dim=1)
@@ -1313,6 +1316,7 @@ if __name__ == "__main__":
     parser.add_argument('--paws_cls_mode', type=str, default='')
     parser.add_argument('--paws_cr_mode', type=str, default='')
     parser.add_argument('--paws_cr_scheduling', type=str, default='const', choices=['const', 'step'])
+    parser.add_argument('--paws_path', type=int, default=1, choices=[0, 1])
 
     parser.add_argument('--to_nn_weight', type=float, default=0.0)
     parser.add_argument('--to_nn_mode', type=str, default='')
