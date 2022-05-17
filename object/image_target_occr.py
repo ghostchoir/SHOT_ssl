@@ -560,14 +560,26 @@ def train_target(args):
                             second_largest = torch.kthvalue(paws_p1, k=2, dim=1)[1].cuda()
                             pred[mut_idx] = second_largest[mut_idx]
 
-            if args.cls_weight != 0:
-                classifier_loss = cls_loss_fn(outputs_test, pred)
-                if args.cls_scheduling in ['const', 'step']:
-                    classifier_loss *= args.cls_weight
-                elif args.cls_scheduling == 'linear':
-                    classifier_loss *= (args.cls_weight * iter_num / max_iter)
-                if iter_num < interval_iter * args.skip_multiplier and args.cls_scheduling == 'step':
-                    classifier_loss *= 0
+            if args.cls_weight != 0 and args.cls_mode != '':
+                cls_idx = torch.zeros_like(agree)
+                if 'ah' in args.cls_mode:
+                    cls_idx = torch.logical_or(cls_idx, ah)
+                if 'al' in args.cls_mode:
+                    cls_idx = torch.logical_or(cls_idx, al)
+                if 'dh' in args.cls_mode:
+                    cls_idx = torch.logical_or(cls_idx, dh)
+                if 'dl' in args.cls_mode:
+                    cls_idx = torch.logical_or(cls_idx, dl)
+                if torch.count_nonzero(cls_idx) > 0:
+                    classifier_loss = cls_loss_fn(outputs_test, pred)
+                    if args.cls_scheduling in ['const', 'step']:
+                        classifier_loss *= args.cls_weight
+                    elif args.cls_scheduling == 'linear':
+                        classifier_loss *= (args.cls_weight * iter_num / max_iter)
+                    if iter_num < interval_iter * args.skip_multiplier and args.cls_scheduling == 'step':
+                        classifier_loss *= 0
+                else:
+                    classifier_loss = torch.tensor(0.0).cuda()
                 logs['kmeans'] = classifier_loss.item() / args.cls_weight
             else:
                 classifier_loss = torch.tensor(0.0).cuda()
@@ -1242,6 +1254,8 @@ if __name__ == "__main__":
     parser.add_argument('--to_nn_weight', type=float, default=0.0)
     parser.add_argument('--to_nn_mode', type=str, default='')
     parser.add_argument('--to_nn_scheduling', type=str, default='const', choices=['const', 'step'])
+
+    parser.add_argument('--cls_mode', type=str, default='ahaldhdl')
 
     args = parser.parse_args()
 
