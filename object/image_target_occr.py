@@ -322,7 +322,7 @@ def train_target(args):
     gt_labels = np.array(copy.deepcopy(dset_loaders["target"].dataset.targets))
     iter_num = 0
 
-    if args.paws_cls_weight != 0 or args.paws_cr_weight != 0:
+    if args.paws_cls_weight != 0 or args.paws_cr_weight != 0 or args.to_nn_weight != 0:
         if args.paws_cls_smooth == 0:
             paws_cls_fn = nn.CrossEntropyLoss()
         else:
