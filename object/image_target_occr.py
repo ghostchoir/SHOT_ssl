@@ -845,10 +845,12 @@ def train_target(args):
         classifier_loss.backward()
         optimizer.step()
 
-        if args.hc_cls_weight != 0 and args.hc_cls_mode != '':
+        try:
             c_optimizer.zero_grad()
             cls_loss.backward()
             c_optimizer.step()
+        except:
+            pass
 
         if iter_num % interval_iter == 0 or iter_num == max_iter:
             netF.eval()
