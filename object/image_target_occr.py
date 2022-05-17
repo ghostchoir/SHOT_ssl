@@ -535,15 +535,14 @@ def train_target(args):
                 mut_idx = torch.zeros_like(agree)
                 if 'conf' in args.mutate_mode:
                     mut_idx = torch.rand(conf1.size()).cuda() > conf1
-                else:
-                    if 'ah' in args.mutate_mode:
-                        mut_idx = torch.logical_or(mut_idx, ah)
-                    if 'al' in args.mutate_mode:
-                        mut_idx = torch.logical_or(mut_idx, al)
-                    if 'dh' in args.mutate_mode:
-                        mut_idx = torch.logical_or(mut_idx, dh)
-                    if 'dl' in args.mutate_mode:
-                        mut_idx = torch.logical_or(mut_idx, dl)
+                if 'ah' in args.mutate_mode:
+                    mut_idx = torch.logical_or(mut_idx, ah)
+                if 'al' in args.mutate_mode:
+                    mut_idx = torch.logical_or(mut_idx, al)
+                if 'dh' in args.mutate_mode:
+                    mut_idx = torch.logical_or(mut_idx, dh)
+                if 'dl' in args.mutate_mode:
+                    mut_idx = torch.logical_or(mut_idx, dl)
                 if torch.count_nonzero(mut_idx) > 0:
                     if args.mutate_mode != '':
                         if args.mutate_to == 'random':
