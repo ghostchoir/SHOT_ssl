@@ -480,6 +480,7 @@ def train_target(args):
 
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
+        lr_scheduler(args, c_optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
 
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
