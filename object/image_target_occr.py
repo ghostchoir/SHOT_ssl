@@ -703,6 +703,30 @@ def train_target(args):
                     paws_cr *= 0
                 classifier_loss += paws_cr
                 logs['PAWScr'] = paws_cr.item() / args.paws_cr_weight
+
+            if args.to_nn_weight != 0 and args.to_nn_mode != '':
+                to_nn_idx = torch.zeros_like(agree)
+                if 'ah' in args.to_nn_mode:
+                    to_nn_idx = torch.logical_or(to_nn_idx, ah)
+                if 'al' in args.to_nn_mode:
+                    to_nn_idx = torch.logical_or(to_nn_idx, al)
+                if 'dh' in args.to_nn_mode:
+                    to_nn_idx = torch.logical_or(to_nn_idx, dh)
+                if 'dl' in args.to_nn_mode:
+                    to_nn_idx = torch.logical_or(to_nn_idx, dl)
+
+                if torch.count_nonzero(to_nn_idx) > 0:
+                    to_nn_pl = torch.kthvalue(paws_p1[to_nn_idx], k=2, dim=1)[1].cuda()
+                    to_nn = paws_cls_fn(outputs_test[to_nn_idx], to_nn_pl)
+                else:
+                    to_nn = torch.tensor(0.0).cuda()
+                if args.to_nn_scheduling in ['const', 'step']:
+                    to_nn = to_nn * args.to_nn_weight
+                if iter_num < interval_iter * args.skip_multiplier and args.to_nn_scheduling == 'step':
+                    to_nn *= 0
+                classifier_loss += to_nn
+                logs['toNN'] = to_nn.item() / args.to_nn_weight
+
         else:
             if args.cls_weight != 0:
                 # with torch.no_grad():
@@ -1214,6 +1238,10 @@ if __name__ == "__main__":
     parser.add_argument('--paws_cls_mode', type=str, default='')
     parser.add_argument('--paws_cr_mode', type=str, default='')
     parser.add_argument('--paws_cr_scheduling', type=str, default='const', choices=['const', 'step'])
+
+    parser.add_argument('--to_nn_weight', type=float, default=0.0)
+    parser.add_argument('--to_nn_mode', type=str, default='')
+    parser.add_argument('--to_nn_scheduling', type=str, default='const', choices=['const', 'step'])
 
     args = parser.parse_args()
 
