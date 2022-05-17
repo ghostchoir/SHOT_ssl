@@ -464,6 +464,12 @@ def train_target(args):
         if inputs_test is not None:
             f1 = netF(inputs_test1)
             b1 = netB(f1)
+            try:
+                for p in netC.parameters():
+                    p.requires_grad = False
+            except:
+                for p in netC.module.parameters():
+                    p.requires_grad = False
             outputs_test = netC(b1, labels_forward)
             conf1 = torch.max(F.softmax(outputs_test, dim=1), dim=1)[0]
         if args.sg2:
@@ -741,6 +747,12 @@ def train_target(args):
                 if 'dl' in args.hc_cls_mode:
                     hc_cls_idx = torch.logical_or(hc_cls_idx, dl)
                 if torch.count_nonzero(hc_cls_idx) > 0:
+                    try:
+                        for p in netC.parameters():
+                            p.requires_grad = True
+                    except:
+                        for p in netC.module.parameters():
+                            p.requires_grad = True
                     cls_pred = netC(b2[hc_cls_idx].detach(), None)
 
                     if args.hc_cls_target == 'paws':
