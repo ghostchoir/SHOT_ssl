@@ -265,6 +265,14 @@ def train_target(args):
         else:
             v.requires_grad = False
 
+    c_param_group = []
+
+    for k, v in netC.named_parameters():
+        if args.separate_wd and ('bias' in k or 'norm' in k):
+            c_param_group += [{'params': v, 'lr': args.c_lr, 'weight_decay': 0}]
+        else:
+            c_param_group += [{'params': v, 'lr': args.c_lr, 'weight_decay': args.c_weight_decay}]
+
     if args.cls_smooth == 0:
         cls_loss_fn = nn.CrossEntropyLoss()
     else:
@@ -286,6 +294,9 @@ def train_target(args):
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
+
+    c_optimizer = optim.SGD(c_param_group)
+    c_optimizer = op_copy(c_optimizer)
 
     if args.initial_memax > 0:
         from paws import maxent_step
@@ -338,6 +349,7 @@ def train_target(args):
             netF.eval()
             netH.eval()
             netB.eval()
+            netC.eval()
 
             args.label_mutate_p = max(0, args.label_mutate_p + args.mutate_p_delta)
             c, p, f, o = get_outputs(dset_loaders['cal'], netF, netH, netB, netC)
@@ -387,6 +399,7 @@ def train_target(args):
             netF.train()
             netH.train()
             netB.train()
+            netC.train()
 
             if use_hc and args.sspl_agreement and hc_active:
                 agree_idxs = np.where(pl == p)[0]
@@ -716,6 +729,26 @@ def train_target(args):
                 classifier_loss += paws_cr
                 logs['PAWScr'] = paws_cr.item() / args.paws_cr_weight
 
+            if args.hc_cls_weight != 0 and args.hc_cls_mode != '':
+                hc_cls_idx = torch.zeros_like(agree)
+                if 'ah' in args.hc_cls_mode:
+                    hc_cls_idx = torch.logical_or(hc_cls_idx, ah)
+                if 'al' in args.hc_cls_mode:
+                    hc_cls_idx = torch.logical_or(hc_cls_idx, al)
+                if 'dh' in args.hc_cls_mode:
+                    hc_cls_idx = torch.logical_or(hc_cls_idx, dh)
+                if 'dl' in args.hc_cls_mode:
+                    hc_cls_idx = torch.logical_or(hc_cls_idx, dl)
+                if torch.count_nonzero(hc_cls_idx) > 0:
+                    cls_pred = netC(b2[hc_cls_idx].detach(), None)
+                    _, paws_pl = torch.max(paws_p1[hc_cls_idx].detach(), dim=1)
+                    cls_loss = cls_loss_fn(cls_pred, paws_pl)
+                else:
+                    cls_loss = torch.tensor(0.0).cuda()
+                logs['HCcls'] = cls_loss.item()
+            else:
+                cls_loss = torch.tensor(0.0).cuda()
+
             if args.to_nn_weight != 0 and args.to_nn_mode != '':
                 to_nn_idx = torch.zeros_like(agree)
                 if 'ah' in args.to_nn_mode:
@@ -807,10 +840,15 @@ def train_target(args):
         classifier_loss.backward()
         optimizer.step()
 
+        c_optimizer.zero_grad()
+        cls_loss.backward()
+        c_optimizer.step()
+
         if iter_num % interval_iter == 0 or iter_num == max_iter:
             netF.eval()
             netH.eval()
             netB.eval()
+            netC.eval()
             try:
                 print(len(hc_set.idxs), 'samples are in HC set')
             except:
@@ -834,6 +872,7 @@ def train_target(args):
             netF.train()
             netH.train()
             netB.train()
+            netC.train()
 
     if args.issave:
         if args.dataparallel:
@@ -1256,6 +1295,9 @@ if __name__ == "__main__":
     parser.add_argument('--to_nn_scheduling', type=str, default='const', choices=['const', 'step'])
 
     parser.add_argument('--cls_mode', type=str, default='ahaldhdl')
+
+    parser.add_argument('--c_lr', type=float, default=1e-4)
+    parser.add_argument('--c_weight_decay', type=float, default=1e-3)
 
     args = parser.parse_args()
 
