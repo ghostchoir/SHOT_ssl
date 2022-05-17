@@ -1298,6 +1298,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--c_lr', type=float, default=1e-4)
     parser.add_argument('--c_weight_decay', type=float, default=1e-3)
+    parser.add_argument('--hc_cls_weight', type=float, default=0)
+    parser.add_argument('--hc_cls_mode', type=str, default='')
 
     args = parser.parse_args()
 
