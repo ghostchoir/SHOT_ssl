@@ -534,7 +534,7 @@ def train_target(args):
             if random.random() <= args.label_mutate_p and args.mutate_mode != '':
                 mut_idx = torch.zeros_like(agree)
                 if 'conf' in args.mutate_mode:
-                    mut_idx = torch.rand(conf1.size()) > conf1
+                    mut_idx = torch.rand(conf1.size()).cuda() > conf1
                 else:
                     if 'ah' in args.mutate_mode:
                         mut_idx = torch.logical_or(mut_idx, ah)
