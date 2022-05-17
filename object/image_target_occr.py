@@ -760,9 +760,13 @@ def train_target(args):
                     elif args.hc_cls_target == 'kmeans':
                         cls_pl = pred[hc_cls_idx]
                     cls_loss = cls_loss_fn(cls_pred, cls_pl)
+                    if args.hc_cls_scheduling in ['const', 'step']:
+                        cls_loss = cls_loss * args.hc_cls_weight
+                    if iter_num < interval_iter * args.skip_multiplier and args.hc_cls_scheduling == 'step':
+                        cls_loss *= 0
                 else:
                     cls_loss = torch.tensor(0.0).cuda()
-                logs['HCcls'] = cls_loss.item()
+                logs['HCcls'] = cls_loss.item() / args.hc_cls_weight
             else:
                 cls_loss = torch.tensor(0.0).cuda()
 
@@ -1321,6 +1325,7 @@ if __name__ == "__main__":
     parser.add_argument('--hc_cls_weight', type=float, default=0)
     parser.add_argument('--hc_cls_mode', type=str, default='')
     parser.add_argument('--hc_cls_target', type=str, default='paws', choices=['paws', 'kmeans'])
+    parser.add_argument('--hc_cls_scheduling', type=str, default='const', choices=['const', 'step'])
 
     args = parser.parse_args()
 
