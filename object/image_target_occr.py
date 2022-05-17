@@ -629,6 +629,12 @@ def train_target(args):
                 if 'dl' in args.maxent_mode:
                     maxent_idx = torch.logical_or(maxent_idx, dl)
                 M_ent = torch.mean(loss.Entropy(softmax_out[maxent_idx]))
+                if args.maxent_scheduling in ['const', 'step']:
+                    M_ent = M_ent * args.maxent_weight
+                elif args.maxent_scheduling == 'linear':
+                    M_ent = M_ent * args.maxent_weight * iter_num / max_iter
+                if iter_num < interval_iter * args.skip_multiplier and args.maxent_scheduling == 'step':
+                    M_ent *= 0
                 classifier_loss -= M_ent
                 logs['Ment'] = M_ent.item()
 
@@ -1200,6 +1206,7 @@ if __name__ == "__main__":
     parser.add_argument('--mutate_to', type=str, default='random', choices=['random', 'second', 'top3'])
     parser.add_argument('--maxent_weight', type=float, default=0.0)
     parser.add_argument('--maxent_mode', type=str, default='')
+    parser.add_argument('--maxent_scheduling', type=str, default='const', choices=['const', 'step'])
     parser.add_argument('--minent_mode', type=str, default='ahaldhdl')
     parser.add_argument('--memax_mode', type=str, default='ahaldhdl')
     parser.add_argument('--ce_hc', type=str2bool, default=False)
