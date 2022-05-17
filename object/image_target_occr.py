@@ -840,7 +840,7 @@ def train_target(args):
         classifier_loss.backward()
         optimizer.step()
 
-        if args.hc_cls_weight != 0 and args.hc_cls_mode != ''
+        if args.hc_cls_weight != 0 and args.hc_cls_mode != '':
             c_optimizer.zero_grad()
             cls_loss.backward()
             c_optimizer.step()
