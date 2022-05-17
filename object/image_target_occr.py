@@ -736,40 +736,6 @@ def train_target(args):
                 classifier_loss += paws_cr
                 logs['PAWScr'] = paws_cr.item() / args.paws_cr_weight
 
-            if args.hc_cls_weight != 0 and args.hc_cls_mode != '':
-                hc_cls_idx = torch.zeros_like(agree)
-                if 'ah' in args.hc_cls_mode:
-                    hc_cls_idx = torch.logical_or(hc_cls_idx, ah)
-                if 'al' in args.hc_cls_mode:
-                    hc_cls_idx = torch.logical_or(hc_cls_idx, al)
-                if 'dh' in args.hc_cls_mode:
-                    hc_cls_idx = torch.logical_or(hc_cls_idx, dh)
-                if 'dl' in args.hc_cls_mode:
-                    hc_cls_idx = torch.logical_or(hc_cls_idx, dl)
-                if torch.count_nonzero(hc_cls_idx) > 0:
-                    try:
-                        for p in netC.parameters():
-                            p.requires_grad = True
-                    except:
-                        for p in netC.module.parameters():
-                            p.requires_grad = True
-                    cls_pred = netC(b2[hc_cls_idx].detach(), None)
-
-                    if args.hc_cls_target == 'paws':
-                        _, cls_pl = torch.max(paws_p1[hc_cls_idx].detach(), dim=1)
-                    elif args.hc_cls_target == 'kmeans':
-                        cls_pl = pred[hc_cls_idx]
-                    cls_loss = cls_loss_fn(cls_pred, cls_pl)
-                    if args.hc_cls_scheduling in ['const', 'step']:
-                        cls_loss = cls_loss * args.hc_cls_weight
-                    if iter_num < interval_iter * args.skip_multiplier and args.hc_cls_scheduling == 'step':
-                        cls_loss *= 0
-                else:
-                    cls_loss = torch.tensor(0.0).cuda()
-                logs['HCcls'] = cls_loss.item() / args.hc_cls_weight
-            else:
-                cls_loss = torch.tensor(0.0).cuda()
-
             if args.to_nn_weight != 0 and args.to_nn_mode != '':
                 to_nn_idx = torch.zeros_like(agree)
                 if 'ah' in args.to_nn_mode:
@@ -860,6 +826,40 @@ def train_target(args):
         optimizer.zero_grad()
         classifier_loss.backward()
         optimizer.step()
+
+        if hc_active and args.hc_cls_weight != 0 and args.hc_cls_mode != '':
+            hc_cls_idx = torch.zeros_like(agree)
+            if 'ah' in args.hc_cls_mode:
+                hc_cls_idx = torch.logical_or(hc_cls_idx, ah)
+            if 'al' in args.hc_cls_mode:
+                hc_cls_idx = torch.logical_or(hc_cls_idx, al)
+            if 'dh' in args.hc_cls_mode:
+                hc_cls_idx = torch.logical_or(hc_cls_idx, dh)
+            if 'dl' in args.hc_cls_mode:
+                hc_cls_idx = torch.logical_or(hc_cls_idx, dl)
+            if torch.count_nonzero(hc_cls_idx) > 0:
+                try:
+                    for p in netC.parameters():
+                        p.requires_grad = True
+                except:
+                    for p in netC.module.parameters():
+                        p.requires_grad = True
+                cls_pred = netC(b2[hc_cls_idx].detach(), None)
+
+                if args.hc_cls_target == 'paws':
+                    _, cls_pl = torch.max(paws_p1[hc_cls_idx].detach(), dim=1)
+                elif args.hc_cls_target == 'kmeans':
+                    cls_pl = pred[hc_cls_idx]
+                cls_loss = cls_loss_fn(cls_pred, cls_pl)
+                if args.hc_cls_scheduling in ['const', 'step']:
+                    cls_loss = cls_loss * args.hc_cls_weight
+                if iter_num < interval_iter * args.skip_multiplier and args.hc_cls_scheduling == 'step':
+                    cls_loss *= 0
+            else:
+                cls_loss = torch.tensor(0.0).cuda()
+            logs['HCcls'] = cls_loss.item() / args.hc_cls_weight
+        else:
+            cls_loss = torch.tensor(0.0).cuda()
 
         try:
             c_optimizer.zero_grad()
