@@ -742,8 +742,12 @@ def train_target(args):
                     hc_cls_idx = torch.logical_or(hc_cls_idx, dl)
                 if torch.count_nonzero(hc_cls_idx) > 0:
                     cls_pred = netC(b2[hc_cls_idx].detach(), None)
-                    _, paws_pl = torch.max(paws_p1[hc_cls_idx].detach(), dim=1)
-                    cls_loss = cls_loss_fn(cls_pred, paws_pl)
+
+                    if args.hc_cls_target == 'paws':
+                        _, cls_pl = torch.max(paws_p1[hc_cls_idx].detach(), dim=1)
+                    elif args.hc_cls_target == 'kmeans':
+                        cls_pl = pred[hc_cls_idx]
+                    cls_loss = cls_loss_fn(cls_pred, cls_pl)
                 else:
                     cls_loss = torch.tensor(0.0).cuda()
                 logs['HCcls'] = cls_loss.item()
@@ -1302,6 +1306,7 @@ if __name__ == "__main__":
     parser.add_argument('--c_weight_decay', type=float, default=1e-3)
     parser.add_argument('--hc_cls_weight', type=float, default=0)
     parser.add_argument('--hc_cls_mode', type=str, default='')
+    parser.add_argument('--hc_cls_target', type=str, default='paws', choices=['paws', 'kmeans'])
 
     args = parser.parse_args()
 
