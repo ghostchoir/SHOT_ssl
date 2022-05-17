@@ -278,11 +278,11 @@ def train_target(args):
         elif args.cr_metric == 'l2':
             dist = nn.PairwiseDistance(p=2)
         elif args.cr_metric == 'bce':
-            dist = nn.BCEWithLogitsLoss(reduction='sum').cuda()
+            dist = nn.BCEWithLogitsLoss(reduction=args.cr_reduction).cuda()
         elif args.cr_metric == 'kl':
-            dist = nn.KLDivLoss(reduction='sum').cuda()
+            dist = nn.KLDivLoss(reduction=args.cr_reduction).cuda()
         elif args.cr_metric == 'js':
-            dist = JSDivLoss(reduction='sum').cuda()
+            dist = JSDivLoss(reduction=args.cr_reduction).cuda()
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
@@ -683,8 +683,12 @@ def train_target(args):
                     paws_cr = paws_cls_fn(paws_p1[paws_cr_idx], pred[paws_cr_idx])
                 else:
                     paws_cr = torch.tensor(0.0).cuda()
-                classifier_loss += args.paws_cr_weight * paws_cr
-                logs['PAWScr'] = paws_cr.item()
+                if args.minent_scheduling in ['const', 'step']:
+                    paws_cr = paws_cr * args.paws_cr_weight
+                if iter_num < interval_iter * args.skip_multiplier and args.paws_cr_scheduling == 'step':
+                    paws_cr *= 0
+                classifier_loss += paws_cr
+                logs['PAWScr'] = paws_cr.item() / args.paws_cr_weight
         else:
             if args.cls_weight != 0:
                 # with torch.no_grad():
@@ -1067,6 +1071,7 @@ if __name__ == "__main__":
     parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce', 'kl', 'js'])
     parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
     parser.add_argument('--cr_threshold', type=float, default=0.0)
+    parser.add_argument('--cr_reduction', type=str, default='sum', choices=['sum', 'mean', 'batchmean'])
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--paws_weight', type=float, default=0.0)
@@ -1193,6 +1198,7 @@ if __name__ == "__main__":
     parser.add_argument('--minent_hc', type=str2bool, default=False)
     parser.add_argument('--paws_cls_mode', type=str, default='')
     parser.add_argument('--paws_cr_mode', type=str, default='')
+    parser.add_argument('--paws_cr_scheduling', type=str, default='const', choices=['const', 'step'])
 
     args = parser.parse_args()
 
