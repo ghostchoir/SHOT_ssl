@@ -1406,6 +1406,7 @@ if __name__ == "__main__":
             else:
                 args.t = i
                 args.name = 'MS_' + names[args.t][0].upper()
+                args.t_dset_path = args.folder + args.dset + '/' + names[args.t] + '_list.txt'
                 args.test_dset_path = args.folder + args.dset + '/' + names[args.t] + '_list.txt'
 
                 args.output_dir_src = osp.join(args.output_src, args.da, args.dset, names[args.t][0].upper())
