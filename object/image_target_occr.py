@@ -1331,6 +1331,8 @@ if __name__ == "__main__":
     parser.add_argument('--hc_cls_target', type=str, default='paws', choices=['paws', 'kmeans'])
     parser.add_argument('--hc_cls_scheduling', type=str, default='const', choices=['const', 'step'])
 
+    parser.add_argument('--multisource', type=str2bool, default=False)
+
     args = parser.parse_args()
 
     args.pretrained = not args.nopretrained
@@ -1367,6 +1369,8 @@ if __name__ == "__main__":
         names = ['c', 'i', 'p']
         args.class_num = 12
 
+    args.names = names
+
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
     if len(args.gpu_id) > 1:
         args.dataparallel = True
@@ -1396,7 +1400,28 @@ if __name__ == "__main__":
             args.out_file = open(osp.join(args.output_dir, 'log_' + args.savename + '.txt'), 'w')
             args.out_file.write(print_args(args) + '\n')
             args.out_file.flush()
+        elif args.multisource:
+            if i != args.t:
+                continue
+            else:
+                args.t = i
+                args.name = 'MS_' + names[args.t][0].upper()
+                args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
 
+                args.output_dir_src = osp.join(args.output_src, args.da, args.dset, names[args.t][0].upper())
+                args.output_dir = osp.join(args.output, args.da, args.dset, 'MS_' + names[args.t][0].upper())
+
+                if not osp.exists(args.output_dir):
+                    os.system('mkdir -p ' + args.output_dir)
+                if not osp.exists(args.output_dir):
+                    os.mkdir(args.output_dir)
+                args.savename = 'par_' + str(args.cls_weight)
+                if args.da == 'pda':
+                    args.gent = ''
+                    args.savename = 'par_' + str(args.cls_weight) + '_thr' + str(args.threshold)
+                args.out_file = open(osp.join(args.output_dir, 'log_' + args.savename + '.txt'), 'w')
+                args.out_file.write(print_args(args) + '\n')
+                args.out_file.flush()
         else:
             if i == args.s:
                 continue
