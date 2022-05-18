@@ -115,35 +115,43 @@ def data_load(args):
                                           num_workers=args.worker, drop_last=False)
 
     else:
-        txt_src = open(args.s_dset_path).readlines()
-        txt_test = open(args.test_dset_path).readlines()
+        if not args.multisource:
+            txt_src = open(args.s_dset_path).readlines()
+            txt_test = open(args.test_dset_path).readlines()
 
-        if not args.da == 'uda':
-            label_map_s = {}
-            for i in range(len(args.src_classes)):
-                label_map_s[args.src_classes[i]] = i
+            if not args.da == 'uda':
+                label_map_s = {}
+                for i in range(len(args.src_classes)):
+                    label_map_s[args.src_classes[i]] = i
 
-            new_src = []
-            for i in range(len(txt_src)):
-                rec = txt_src[i]
-                reci = rec.strip().split(' ')
-                if int(reci[1]) in args.src_classes:
-                    line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'
-                    new_src.append(line)
-            txt_src = new_src.copy()
-
-            new_tar = []
-            for i in range(len(txt_test)):
-                rec = txt_test[i]
-                reci = rec.strip().split(' ')
-                if int(reci[1]) in args.tar_classes:
+                new_src = []
+                for i in range(len(txt_src)):
+                    rec = txt_src[i]
+                    reci = rec.strip().split(' ')
                     if int(reci[1]) in args.src_classes:
                         line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'
-                        new_tar.append(line)
-                    else:
-                        line = reci[0] + ' ' + str(len(label_map_s)) + '\n'
-                        new_tar.append(line)
-            txt_test = new_tar.copy()
+                        new_src.append(line)
+                txt_src = new_src.copy()
+
+                new_tar = []
+                for i in range(len(txt_test)):
+                    rec = txt_test[i]
+                    reci = rec.strip().split(' ')
+                    if int(reci[1]) in args.tar_classes:
+                        if int(reci[1]) in args.src_classes:
+                            line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'
+                            new_tar.append(line)
+                        else:
+                            line = reci[0] + ' ' + str(len(label_map_s)) + '\n'
+                            new_tar.append(line)
+                txt_test = new_tar.copy()
+        else:
+            txt_src = []
+            txt_test = open(args.test_dset_path).readlines()
+            for i in range(args.names):
+                if i != args.t:
+                    dset_path = folder + args.dset + '/' + names[i] + '_list.txt'
+                    txt_src += open(dset_path).readlines()
 
         if args.trte == "val":
             dsize = len(txt_src)
@@ -774,6 +782,8 @@ if __name__ == "__main__":
     parser.add_argument('--class_stratified', type=str2bool, default=False)
     parser.add_argument('--per_class_batch_size', type=int, default=6)
 
+    parser.add_argument('--multisource', type=str2bool, default=False)
+
     args = parser.parse_args()
 
     args.pretrained = not args.nopretrained
@@ -808,6 +818,8 @@ if __name__ == "__main__":
         names = ['c', 'i', 'p']
         args.class_num = 12
 
+    args.names = names
+
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
     if len(args.gpu_id) > 1:
         args.dataparallel = True
@@ -836,8 +848,12 @@ if __name__ == "__main__":
         args.output_dir_src = osp.join(args.output, args.da, args.dset, 'source')
         args.name_src = 'source'
     else:
-        args.output_dir_src = osp.join(args.output, args.da, args.dset, names[args.s][0].upper())
-        args.name_src = names[args.s][0].upper()
+        if not args.multisource:
+            args.output_dir_src = osp.join(args.output, args.da, args.dset, names[args.s][0].upper())
+            args.name_src = names[args.s][0].upper()
+        else:
+            args.output_dir_src = osp.join(args.output, args.da, args.dset, names[args.t][0].upper())
+            args.name_src = names[args.t][0].upper()
 
         args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
         args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
