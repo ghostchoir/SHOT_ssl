@@ -873,6 +873,13 @@ if __name__ == "__main__":
         if args.dset in ['CIFAR-10-C', 'CIFAR-100-C']:
             args.t = i
             args.name = names[args.t]
+        elif args.multisource:
+            if i != args.t:
+                continue
+            else:
+                args.t = i
+                args.name = 'MS_' + names[args.t][0].upper()
+                args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
         else:
             if i == args.s:
                 continue
