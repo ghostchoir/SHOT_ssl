@@ -150,6 +150,7 @@ def data_load(args):
             txt_test = open(args.test_dset_path).readlines()
             for i in range(len(args.names)):
                 if i != args.t:
+                    print(args.names[i] + ' added to src dset')
                     dset_path = folder + args.dset + '/' + names[i] + '_list.txt'
                     txt_src += open(dset_path).readlines()
 
