@@ -148,7 +148,7 @@ def data_load(args):
         else:
             txt_src = []
             txt_test = open(args.test_dset_path).readlines()
-            for i in range(args.names):
+            for i in range(len(args.names)):
                 if i != args.t:
                     dset_path = folder + args.dset + '/' + names[i] + '_list.txt'
                     txt_src += open(dset_path).readlines()
