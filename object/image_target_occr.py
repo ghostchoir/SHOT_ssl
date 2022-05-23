@@ -374,7 +374,8 @@ def train_target(args):
 
                 hc_set = ImageList_pl_update(txt_tar, p[hc_idxs], transform=image_hc(args), idxs=hc_idxs)
                 hc_bsize = min(args.paws_batch_size, len(hc_set) // args.class_num)
-                hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize, args.class_num, seed=args.seed)
+                hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize,
+                                                    int(args.class_num * args.class_subsample_ratio), seed=args.seed)
                 print('HC bsize is set to', hc_bsize)
 
                 hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
@@ -411,7 +412,8 @@ def train_target(args):
                 print(len(filter_idxs), len(topk_idxs))
                 hc_set.include(pl[topk_idxs], topk_idxs)
                 hc_bsize = min(args.paws_batch_size, len(hc_set) // args.class_num)
-                hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize, args.class_num, seed=args.seed)
+                hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize,
+                                                    int(args.class_num * args.class_subsample_ratio), seed=args.seed)
                 print('HC bsize is set to', hc_bsize)
                 hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
@@ -704,7 +706,8 @@ def train_target(args):
                             paws_p = paws_p1[paws_cls_idx]
                         if args.sharpen_paws_p:
                             paws_p = sharpen(paws_p[paws_cls_idx])
-                        paws_cls = F.binary_cross_entropy_with_logits(outputs_test[paws_cls_idx], paws_p, reduction='mean')
+                        paws_cls = F.binary_cross_entropy_with_logits(outputs_test[paws_cls_idx], paws_p,
+                                                                      reduction='mean')
                     else:
                         _, paws_pl = torch.max(paws_p1[paws_cls_idx].detach(), dim=1)
                         paws_cls = paws_cls_fn(outputs_test[paws_cls_idx], paws_pl)
@@ -806,7 +809,8 @@ def train_target(args):
         if args.cr_weight != 0:
             try:
                 if args.sg2_cr and not args.sg2:
-                    cr_loss = dist(f_hard[conf1 >= args.cr_threshold], f_weak.detach()[conf1 >= args.cr_threshold]).mean()
+                    cr_loss = dist(f_hard[conf1 >= args.cr_threshold],
+                                   f_weak.detach()[conf1 >= args.cr_threshold]).mean()
                 else:
                     cr_loss = dist(f_hard[conf1 >= args.cr_threshold], f_weak[conf1 >= args.cr_threshold]).mean()
 
@@ -887,7 +891,8 @@ def train_target(args):
                                                                             acc_s_te) + '\n' + acc_list + '\n'
             else:
                 acc_s_te, _ = cal_acc(dset_loaders['test'], netF, netH, netB, netC, False)
-                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter, acc_s_te) + '\n'
+                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter,
+                                                                            acc_s_te) + '\n'
 
             for k, v in logs.items():
                 log_str += k + ' {:.3f}'.format(v) + ', '
@@ -1332,6 +1337,8 @@ if __name__ == "__main__":
     parser.add_argument('--hc_cls_scheduling', type=str, default='const', choices=['const', 'step'])
 
     parser.add_argument('--multisource', type=str2bool, default=False)
+
+    parser.add_argument('--class_subsample_ratio', type=float, default=1.0)
 
     args = parser.parse_args()
 
