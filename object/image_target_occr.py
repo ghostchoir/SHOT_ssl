@@ -376,7 +376,7 @@ def train_target(args):
                 hc_bsize = min(args.paws_batch_size, len(hc_set) // args.class_num)
                 hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize,
                                                     int(args.class_num * args.class_subsample_ratio), seed=args.seed,
-                                                    unique_classes=args.class_subsample_ratio == 0)
+                                                    unique_classes=args.class_subsample_ratio != 1.0)
                 print('HC bsize is set to', hc_bsize)
 
                 hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
@@ -415,7 +415,7 @@ def train_target(args):
                 hc_bsize = min(args.paws_batch_size, len(hc_set) // args.class_num)
                 hc_sampler = ClassStratifiedSampler(hc_set, 1, 0, hc_bsize,
                                                     int(args.class_num * args.class_subsample_ratio), seed=args.seed,
-                                                    unique_classes=args.class_subsample_ratio == 0)
+                                                    unique_classes=args.class_subsample_ratio != 1.0)
                 print('HC bsize is set to', hc_bsize)
                 hc_loader = DataLoader(hc_set, batch_sampler=hc_sampler, shuffle=False)
 
