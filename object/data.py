@@ -354,7 +354,7 @@ def get_image_transform(mode, args, resize_size=256, crop_size=224):
         ]
     elif mode == 'simclr':
         s = args.aug_strength
-        prob = arg.aug_prob_mult
+        prob = args.aug_prob_mult
         color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
         if args.use_rrc:
             if args.custom_scale:
