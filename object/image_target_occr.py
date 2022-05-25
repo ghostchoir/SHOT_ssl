@@ -1359,6 +1359,7 @@ if __name__ == "__main__":
     parser.add_argument('--multisource', type=str2bool, default=False)
 
     parser.add_argument('--class_subsample_ratio', type=float, default=1.0)
+    parser.add_argument('--aug_prob_mult', type=float, default=1.0)
 
     args = parser.parse_args()
 
