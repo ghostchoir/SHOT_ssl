@@ -527,7 +527,7 @@ def train_target(args):
             inputs_hc = inputs_hc.cuda()
             b_hc = netB(netF(inputs_hc))
             c_hc = netC(b_hc, labels_forward)
-            c_hc_conf_value += torch.mean(torch.max(c_hc, dim=1)[0]).item()
+            c_hc_conf_value += torch.mean(torch.max(F.softmax(c_hc, dim=1), dim=1)[0]).item()
             c_hc_count += 1
             labels_hc = labels_hc.cuda()
             labels_hc_onehot = F.one_hot(labels_hc, num_classes=args.class_num) \
