@@ -351,6 +351,12 @@ def train_target(args):
             netB.eval()
             netC.eval()
 
+            c_hc_conf_value = 0
+            c_hc_count = 0
+
+            conf_value = 0
+            conf_count = 0
+
             args.label_mutate_p = max(0, args.label_mutate_p + args.mutate_p_delta)
             c, p, f, o = get_outputs(dset_loaders['cal'], netF, netH, netB, netC)
             hc_idxs = get_topk_conf_indices(c, p, n_classes=args.class_num, k=args.hc_topk, threshold=args.hc_threshold)
@@ -476,6 +482,8 @@ def train_target(args):
                     p.requires_grad = False
             outputs_test = netC(b1, labels_forward)
             conf1 = torch.max(F.softmax(outputs_test, dim=1), dim=1)[0]
+            conf_value += torch.mean(conf1).item()
+            conf_count += 1
         if args.sg2:
             with torch.no_grad():
                 f2 = netF(inputs_test2)
@@ -519,7 +527,8 @@ def train_target(args):
             inputs_hc = inputs_hc.cuda()
             b_hc = netB(netF(inputs_hc))
             c_hc = netC(b_hc, labels_forward)
-
+            c_hc_conf_value += torch.mean(torch.max(c_hc, dim=1)[0]).item()
+            c_hc_count += 1
             labels_hc = labels_hc.cuda()
             labels_hc_onehot = F.one_hot(labels_hc, num_classes=args.class_num) \
                                * (1 - (1 + 1 / args.class_num) * args.paws_smoothing)
@@ -887,14 +896,23 @@ def train_target(args):
             except:
                 pass
 
+            avg_conf = conf_value / conf_count
+            avg_hc_conf = c_hc_conf_value / c_hc_count
+
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
-                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter,
-                                                                            acc_s_te) + '\n' + acc_list + '\n'
+                log_str = 'Task: {}, Iter:{}/{}; HC Conf: {}; Conf: {}; Accuracy = {:.2f}%'.format(args.name, iter_num,
+                                                                                                   max_iter,
+                                                                                                   avg_hc_conf,
+                                                                                                   avg_conf,
+                                                                                                   acc_s_te) + '\n' + acc_list + '\n'
             else:
                 acc_s_te, _ = cal_acc(dset_loaders['test'], netF, netH, netB, netC, False)
-                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter,
-                                                                            acc_s_te) + '\n'
+                log_str = 'Task: {}, Iter:{}/{}; HC Conf: {}; Conf: {}; Accuracy = {:.2f}%'.format(args.name, iter_num,
+                                                                                                   max_iter,
+                                                                                                   avg_hc_conf,
+                                                                                                   avg_conf,
+                                                                                                   acc_s_te) + '\n'
 
             for k, v in logs.items():
                 log_str += k + ' {:.3f}'.format(v) + ', '
