@@ -897,7 +897,10 @@ def train_target(args):
                 pass
 
             avg_conf = conf_value / conf_count
-            avg_hc_conf = c_hc_conf_value / c_hc_count
+            try:
+                avg_hc_conf = c_hc_conf_value / c_hc_count
+            except:
+                avg_hc_conf = 0.0
 
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
                 acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
