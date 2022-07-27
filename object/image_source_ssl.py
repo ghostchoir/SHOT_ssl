@@ -705,7 +705,7 @@ if __name__ == "__main__":
     parser.add_argument('--worker', type=int, default=8, help="number of workers")
     parser.add_argument('--dset', type=str, default='office-home',
                         choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C',
-                                 'image-clef', 'modern-office'])
+                                 'image-clef', 'modern-office', 'domainnet'])
     parser.add_argument('--level', type=int, default=5)
     parser.add_argument('--folder', type=str, default='/SSD/euntae/data/')
     parser.add_argument('--lr', type=float, default=1e-2, help="learning rate")
@@ -820,6 +820,9 @@ if __name__ == "__main__":
     if args.dset == 'image-clef':
         names = ['c', 'i', 'p']
         args.class_num = 12
+    if args.dset == 'domainnet':
+        names = ['clipart', 'infograph', 'painting', 'quickdraw', 'real', 'sketch']
+        args.class_num = 345
 
     args.names = names
 

@@ -1399,6 +1399,9 @@ if __name__ == "__main__":
     if args.dset == 'image-clef':
         names = ['c', 'i', 'p']
         args.class_num = 12
+    if args.dset == 'domainnet':
+        names = ['clipart', 'infograph', 'painting', 'quickdraw', 'real', 'sketch']
+        args.class_num = 345
 
     args.names = names
 
