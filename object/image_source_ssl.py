@@ -113,11 +113,6 @@ def data_load(args):
         dsets["test"] = cifar100c_dset(args)
         dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
-
-    elif args.dset == 'domainnet':
-        if not args.multisource:
-            txt_src = open(args.s_dset_path).readlines()
-            txt_test = open(args.test_dset_path).readlines()
     else:
         if not args.multisource:
             txt_src = open(args.s_dset_path).readlines()
