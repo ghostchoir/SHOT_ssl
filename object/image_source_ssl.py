@@ -114,6 +114,10 @@ def data_load(args):
         dset_loaders["test"] = DataLoader(dsets["test"], batch_size=train_bs * 4, shuffle=False,
                                           num_workers=args.worker, drop_last=False)
 
+    elif args.dset == 'domainnet':
+        if not args.multisource:
+            txt_src = open(args.s_dset_path).readlines()
+            txt_test = open(args.test_dset_path).readlines()
     else:
         if not args.multisource:
             txt_src = open(args.s_dset_path).readlines()
@@ -154,19 +158,23 @@ def data_load(args):
                     dset_path = folder + args.dset + '/' + names[i] + '_list.txt'
                     txt_src += open(dset_path).readlines()
 
-        if args.trte == "val":
-            dsize = len(txt_src)
-            tr_size = int(args.split_ratio * dsize)
-            # print(dsize, tr_size, dsize - tr_size)
-            tr_txt, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
-        elif args.trte == "nosplit":
+        if args.dset == 'domainnet':
             tr_txt = txt_src
-            te_txt = txt_src
+            te_txt = txt_test
         else:
-            dsize = len(txt_src)
-            tr_size = int(args.split_ratio * dsize)
-            _, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
-            tr_txt = txt_src
+            if args.trte == "val":
+                dsize = len(txt_src)
+                tr_size = int(args.split_ratio * dsize)
+                # print(dsize, tr_size, dsize - tr_size)
+                tr_txt, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
+            elif args.trte == "nosplit":
+                tr_txt = txt_src
+                te_txt = txt_src
+            else:
+                dsize = len(txt_src)
+                tr_size = int(args.split_ratio * dsize)
+                _, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
+                tr_txt = txt_src
 
         dsets["source_tr"] = ImageList(tr_txt, transform=image_train(args))
         cls_dist = [0] * args.class_num
@@ -861,8 +869,12 @@ if __name__ == "__main__":
             args.output_dir_src = osp.join(args.output, args.da, args.dset, names[args.t][0].upper())
             args.name_src = names[args.t][0].upper()
 
-        args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
-        args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
+        if args.dset == 'domainnet':
+            args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_train.txt'
+            args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_test.txt'
+        else:
+            args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
+            args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
 
     if not osp.exists(args.output_dir_src):
         os.system('mkdir -p ' + args.output_dir_src)
