@@ -905,8 +905,12 @@ if __name__ == "__main__":
             args.name = names[args.s][0].upper() + names[args.t][0].upper()
 
             folder = args.folder
-            args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
-            args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
+            if args.dset == 'domainnet':
+                args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_train.txt'
+                args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_test.txt'
+            else:
+                args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
+                args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
 
             if args.dset == 'office-home':
                 if args.disable_aug_for_shape:
