@@ -172,16 +172,17 @@ def data_load(args):
                 tr_txt = txt_src
 
         dsets["source_tr"] = ImageList(tr_txt, transform=image_train(args))
-        cls_dist = [0] * args.class_num
-        for img in dsets["source_tr"].imgs:
-            _, cls = img
-            cls = int(cls)
-            cls_dist[cls] += 1 / len(dsets["source_tr"].imgs)
+        if args.ce_weighting:
+            cls_dist = [0] * args.class_num
+            for img in dsets["source_tr"].imgs:
+                _, cls = img
+                cls = int(cls)
+                cls_dist[cls] += 1 / len(dsets["source_tr"].imgs)
 
-        cls_dist_inv = [1 / p for p in cls_dist]
-        min_dist = min(cls_dist_inv)
-        cls_dist_inv_norm = [p / min_dist for p in cls_dist_inv]
-        args.ce_weight = cls_dist_inv_norm
+            cls_dist_inv = [1 / p for p in cls_dist]
+            min_dist = min(cls_dist_inv)
+            cls_dist_inv_norm = [p / min_dist for p in cls_dist_inv]
+            args.ce_weight = cls_dist_inv_norm
 
         if args.class_stratified:
             from paws import ClassStratifiedSampler
