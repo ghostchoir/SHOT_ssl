@@ -116,6 +116,8 @@ def data_load(args):
     else:
         if not args.multisource:
             txt_src = open(args.s_dset_path).readlines()
+            if args.dset == 'domainnet':
+                txt_src_test = open(args.s_dset_test_path).readlines()
             txt_test = open(args.test_dset_path).readlines()
 
             if not args.da == 'uda':
@@ -145,17 +147,28 @@ def data_load(args):
                             new_tar.append(line)
                 txt_test = new_tar.copy()
         else:
-            txt_src = []
-            txt_test = open(args.test_dset_path).readlines()
-            for i in range(len(args.names)):
-                if i != args.t:
-                    print(args.names[i] + ' added to src dset')
-                    dset_path = folder + args.dset + '/' + names[i] + '_list.txt'
-                    txt_src += open(dset_path).readlines()
+            if args.dset == 'domainnet':
+                txt_src = []
+                txt_src_test = []
+                for i in range(len(args.names)):
+                    if i != args.t:
+                        print(args.names[i] + ' added to src dset')
+                        dset_path = folder + args.dset + '/' + names[i] + '_train.txt'
+                        txt_src += open(dset_path).readlines()
+                        dset_path = folder + args.dset + '/' + names[i] + '_test.txt'
+                        txt_src_test += open(dset_path).readlines()
+            else:
+                txt_src = []
+                txt_test = open(args.test_dset_path).readlines()
+                for i in range(len(args.names)):
+                    if i != args.t:
+                        print(args.names[i] + ' added to src dset')
+                        dset_path = folder + args.dset + '/' + names[i] + '_list.txt'
+                        txt_src += open(dset_path).readlines()
 
         if args.dset == 'domainnet':
             tr_txt = txt_src
-            te_txt = txt_test
+            te_txt = txt_src_test
         else:
             if args.trte == "val":
                 dsize = len(txt_src)
@@ -867,6 +880,7 @@ if __name__ == "__main__":
 
         if args.dset == 'domainnet':
             args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_train.txt'
+            args.s_dset_test_path = folder + args.dset + '/' + names[args.s] + '_test.txt'
             args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_test.txt'
         else:
             args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
@@ -903,7 +917,8 @@ if __name__ == "__main__":
             folder = args.folder
             if args.dset == 'domainnet':
                 args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_train.txt'
-                args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_test.txt'
+                args.s_dset_test_path = folder + args.dset + '/' + names[args.s] + '_test.txt'
+                args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
             else:
                 args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
                 args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
