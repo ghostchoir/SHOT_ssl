@@ -157,6 +157,7 @@ def data_load(args):
                         txt_src += open(dset_path).readlines()
                         dset_path = folder + args.dset + '/' + names[i] + '_test.txt'
                         txt_src_test += open(dset_path).readlines()
+                txt_test = open(args.test_dset_path).readlines()
             else:
                 txt_src = []
                 txt_test = open(args.test_dset_path).readlines()
