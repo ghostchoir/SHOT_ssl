@@ -1360,6 +1360,7 @@ if __name__ == "__main__":
     parser.add_argument('--hc_cls_scheduling', type=str, default='const', choices=['const', 'step'])
 
     parser.add_argument('--multisource', type=str2bool, default=False)
+    parser.add_argument('--ms-split', type=str, default='total', choices=['total', 'split'])
 
     parser.add_argument('--class_subsample_ratio', type=float, default=1.0)
     parser.add_argument('--aug_prob_mult', type=float, default=1.0)
@@ -1440,8 +1441,12 @@ if __name__ == "__main__":
             else:
                 args.t = i
                 args.name = 'MS_' + names[args.t][0].upper()
-                args.t_dset_path = args.folder + args.dset + '/' + names[args.t] + '_list.txt'
-                args.test_dset_path = args.folder + args.dset + '/' + names[args.t] + '_list.txt'
+                if args.ms_split == 'total':
+                    args.t_dset_path = args.folder + args.dset + '/' + names[args.t] + '_list.txt'
+                    args.test_dset_path = args.folder + args.dset + '/' + names[args.t] + '_list.txt'
+                elif args.ms_split == 'split':
+                    args.t_dset_path = args.folder + args.dset + '/' + names[args.t] + '_train.txt'
+                    args.test_dset_path = args.folder + args.dset + '/' + names[args.t] + '_test.txt'
 
                 args.output_dir_src = osp.join(args.output_src, args.da, args.dset, names[args.t][0].upper())
                 args.output_dir = osp.join(args.output, args.da, args.dset, 'MS_' + names[args.t][0].upper())
