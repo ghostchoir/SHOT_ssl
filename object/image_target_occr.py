@@ -118,12 +118,17 @@ def data_load(args):
         dset_loaders["target"] = DataLoader(dsets["target"], batch_size=train_bs, shuffle=True, num_workers=args.worker,
                                             drop_last=True)
 
-        dsets["pl"] = ImageList_idx(txt_test, transform=image_pl(args))
+        if args.ms_split == 'total':
+            dsets["pl"] = ImageList_idx(txt_test, transform=image_pl(args))
+        elif args.ms_split == 'split':
+            dsets["pl"] = ImageList_idx(txt_tar, transform=image_pl(args))
 
         dset_loaders["pl"] = DataLoader(dsets["pl"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                         num_workers=args.worker, drop_last=False)
-
-        dsets["cal"] = ImageList_idx(txt_test, transform=image_cal(args))
+        if args.ms_split == 'total':
+            dsets["cal"] = ImageList_idx(txt_test, transform=image_cal(args))
+        elif args.ms_split == 'split':
+            dsets["cal"] = ImageList_idx(txt_tar, transform=image_cal(args))
 
         dset_loaders["cal"] = DataLoader(dsets["cal"], batch_size=train_bs * args.eval_batch_mult, shuffle=False,
                                          num_workers=args.worker, drop_last=False)
