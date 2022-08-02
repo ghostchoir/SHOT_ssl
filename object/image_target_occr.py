@@ -1032,6 +1032,8 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
                 weights = copy.deepcopy(netC.fc.weight.data).detach().cpu().numpy()
         else:
             weights = 'k-means++'
+        if args.random_init_centroids:
+            weights = 'random'
         all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
         conf, predict = torch.max(all_output, 1)
         accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
@@ -1369,6 +1371,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--class_subsample_ratio', type=float, default=1.0)
     parser.add_argument('--aug_prob_mult', type=float, default=1.0)
+    parser.add_argument('--random-init-centroids', type=str2bool, default=False)
 
     args = parser.parse_args()
 
