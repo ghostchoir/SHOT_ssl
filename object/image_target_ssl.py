@@ -21,6 +21,8 @@ from sklearn.cluster import KMeans
 from scipy.special import softmax
 from sklearn.preprocessing import normalize
 
+from spherical_kmeans import SphericalKMeans
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -699,12 +701,16 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
 
         conf_thres_idx = np.where(conf >= args.pl_threshold)
-        if args.pl_type == 'spherical_kmeans':
+        if args.pl_type in ['spherical_kmeans', 'spherical_kmeans_old']:
             if args.init_centroids_with_cls:
                 weights = normalize(weights)
             all_fea_norm = F.normalize(all_fea, dim=1)
-            kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
-                .fit(all_fea_norm[conf_thres_idx], sample_weight=conf[conf_thres_idx] if args.weighted_samples else None)
+            if 'old' in args.pl_type:
+                kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
+                    .fit(all_fea_norm[conf_thres_idx], sample_weight=conf[conf_thres_idx] if args.weighted_samples else None)
+            else:
+                kmeans = SphericalKMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
+                    .fit(all_fea_norm[conf_thres_idx], sample_weight=conf[conf_thres_idx] if args.weighted_samples else None)
         else:
             kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
                 .fit(all_fea[conf_thres_idx], sample_weight=conf[conf_thres_idx] if args.weighted_samples else None)
@@ -864,7 +870,8 @@ if __name__ == "__main__":
     parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--distance', type=str, default='cosine', choices=["euclidean", "cosine"])
-    parser.add_argument('--pl_type', type=str, default="sspl", choices=["naive", "sspl", "kmeans", "spherical_kmeans"])
+    parser.add_argument('--pl_type', type=str, default="sspl",
+        choices=["naive", "sspl", "kmeans", "spherical_kmeans", "spherical_kmeans_old"])
     parser.add_argument('--weighted_samples', type=str2bool, default=False)
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--output_src', type=str, default='san')
@@ -892,8 +899,10 @@ if __name__ == "__main__":
     parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls', 'uniform'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
     parser.add_argument('--pl_temperature', type=float, default=1.0)
-    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
-    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug1', type=str, default='simclr', 
+        choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
+    parser.add_argument('--aug2', type=str, default='simclr', 
+        choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
     parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--aug_pl', type=str, default='test', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--ra_n', type=int, default=1)

@@ -756,9 +756,12 @@ if __name__ == "__main__":
     parser.add_argument('--norm_feat', action='store_true')
     parser.add_argument('--norm_btn', action='store_true')
     parser.add_argument('--embedding_dim', type=int, default=128)
-    parser.add_argument('--aug1', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
-    parser.add_argument('--aug2', type=str, default='simclr', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
-    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug1', type=str, default='simclr', 
+    choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
+    parser.add_argument('--aug2', type=str, default='simclr', 
+    choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
+    parser.add_argument('--aug3', type=str, default='weak', 
+    choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
     parser.add_argument('--ra_n', type=int, default=1)
     parser.add_argument('--ra_m', type=int, default=10)
     parser.add_argument('--sg3', type=str2bool, default=True)
@@ -771,10 +774,10 @@ if __name__ == "__main__":
     parser.add_argument('--nogaussblur', action='store_true')
     parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
 
-    parser.add_argument('--dropout_1', type=float, default=0.2)
-    parser.add_argument('--dropout_2', type=float, default=0.2)
-    parser.add_argument('--dropout_3', type=float, default=0.2)
-    parser.add_argument('--dropout_4', type=float, default=0.2)
+    parser.add_argument('--dropout_1', type=float, default=0.0)
+    parser.add_argument('--dropout_2', type=float, default=0.0)
+    parser.add_argument('--dropout_3', type=float, default=0.0)
+    parser.add_argument('--dropout_4', type=float, default=0.0)
 
     parser.add_argument('--ce_weighting', type=str2bool, default=False)
 
@@ -783,9 +786,6 @@ if __name__ == "__main__":
     parser.add_argument('--metric_s', type=float, default=30.0)
     parser.add_argument('--metric_m', type=float, default=0.5)
     parser.add_argument('--easy_margin', type=str2bool, default=False)
-
-    parser.add_argument('--im_weight', type=float, default=0)
-    parser.add_argument('--gent', type=str2bool, default=True)
 
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
 

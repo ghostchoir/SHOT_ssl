@@ -2,7 +2,8 @@ from torchvision import transforms, datasets
 import numpy as np
 import cv2
 
-from RandAugment import RandAugment
+#from RandAugment import RandAugment
+from torchvision.transforms import RandAugment
 
 cv2.setNumThreads(0)
 from data_list import CIFAR10_idx, CIFAR100_idx
@@ -354,7 +355,7 @@ def get_image_transform(mode, args, resize_size=256, crop_size=224):
         ]
     elif mode == 'simclr':
         s = args.aug_strength
-        prob = args.aug_prob_mult
+        prob = 1.
         color_jitter = transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s)
         if args.use_rrc:
             if args.custom_scale:
@@ -391,6 +392,22 @@ def get_image_transform(mode, args, resize_size=256, crop_size=224):
         trfs += [
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
+            transforms.RandomErasing()
+        ]
+    elif mode == 'augmix':
+        trfs = [
+            transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0)),
+            transforms.RandomHorizontalFlip(),
+            transforms.AugMix(),
+            transforms.ToTensor()]
+    elif mode == 'trivial':
+        s = args.aug_strength
+        trfs = [
+            transforms.TrivialAugmentWide(),
+            transforms.RandomResizedCrop(size=crop_size, scale=(0.2, 1.0)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ColorJitter(0.4 * s, 0.4 * s, 0.4 * s, 0.1 * s),
+            transforms.ToTensor()
         ]
     elif mode == 'test':
         trfs = [transforms.Resize((resize_size, resize_size)),
