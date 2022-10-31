@@ -568,7 +568,7 @@ def _update(X, labels, distances, n_clusters, sample_weight=None):
             if sample_weight is None:
                 centers[curr_label, j] += data[ind]
             else:
-                centers[curr_label, j] += data[ind] * sample_weight[ind]
+                centers[curr_label, j] += data[ind] * sample_weight[i]
 
     # L2 normalization
     centers = normalize(centers)
