@@ -713,8 +713,8 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
                 # csr_feat = sparse.csr_matrix(all_fea_norm[conf_thres_idx])
                 # kmeans = SphericalKMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
                 #     .fit(csr_feat, sample_weight=conf[conf_thres_idx] if args.weighted_samples else None)
-                from spherecluster import SphericalKMeans
-                kemans = SphericalKMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
+                from spherical_kmeans import SphericalKMeans
+                kmeans = SphericalKMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
                     .fit(all_fea[conf_thres_idx], sample_weight=conf[conf_thres_idx] if args.weighted_samples else None)
         else:
             kmeans = KMeans(n_clusters=args.class_num, init=weights, max_iter=1000)\
