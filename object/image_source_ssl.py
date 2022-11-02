@@ -1,5 +1,6 @@
 import argparse
-import os, sys
+import os
+import sys
 import os.path as osp
 import torchvision
 import numpy as np
@@ -8,11 +9,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import transforms, datasets
-import network, loss
+import network
+import loss
 from torch.utils.data import DataLoader
 from data_list import ImageList, ImageList_update
 from data import *
-import random, pdb, math, copy
+import random
+import pdb
+import math
+import copy
 from tqdm import tqdm
 from loss import CrossEntropyLabelSmooth, NTXentLoss, SupConLoss, LabelSmoothedSCLLoss, Entropy, FocalLoss, JSDivLoss
 from scipy.spatial.distance import cdist
@@ -47,7 +52,8 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
         if iter_num < warmup_iter:
             decay = iter_num / warmup_iter
         else:
-            decay = np.cos((iter_num - warmup_iter) * np.pi / (2 * (max_iter - warmup_iter)))
+            decay = np.cos((iter_num - warmup_iter) * np.pi /
+                           (2 * (max_iter - warmup_iter)))
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr0'] * decay
         param_group['weight_decay'] = args.weight_decay
@@ -56,8 +62,27 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
     return optimizer
 
 
+def mixup_data(x, y, alpha=1.0):
+    '''Returns mixed inputs, pairs of targets, and lambda'''
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    batch_size = x.size()[0]
+    index = torch.randperm(batch_size)
+
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+
+def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
 def data_load(args):
-    ## prepare data
+    # prepare data
     dsets = {}
     dset_loaders = {}
     train_bs = args.batch_size
@@ -130,7 +155,8 @@ def data_load(args):
                     rec = txt_src[i]
                     reci = rec.strip().split(' ')
                     if int(reci[1]) in args.src_classes:
-                        line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'
+                        line = reci[0] + ' ' + \
+                            str(label_map_s[int(reci[1])]) + '\n'
                         new_src.append(line)
                 txt_src = new_src.copy()
 
@@ -140,7 +166,8 @@ def data_load(args):
                     reci = rec.strip().split(' ')
                     if int(reci[1]) in args.tar_classes:
                         if int(reci[1]) in args.src_classes:
-                            line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'
+                            line = reci[0] + ' ' + \
+                                str(label_map_s[int(reci[1])]) + '\n'
                             new_tar.append(line)
                         else:
                             line = reci[0] + ' ' + str(len(label_map_s)) + '\n'
@@ -153,9 +180,11 @@ def data_load(args):
                 for i in range(len(args.names)):
                     if i != args.t:
                         print(args.names[i] + ' added to src dset')
-                        dset_path = folder + args.dset + '/' + names[i] + '_train.txt'
+                        dset_path = folder + args.dset + \
+                            '/' + names[i] + '_train.txt'
                         txt_src += open(dset_path).readlines()
-                        dset_path = folder + args.dset + '/' + names[i] + '_test.txt'
+                        dset_path = folder + args.dset + \
+                            '/' + names[i] + '_test.txt'
                         txt_src_test += open(dset_path).readlines()
                 txt_test = open(args.test_dset_path).readlines()
             else:
@@ -164,7 +193,8 @@ def data_load(args):
                 for i in range(len(args.names)):
                     if i != args.t:
                         print(args.names[i] + ' added to src dset')
-                        dset_path = folder + args.dset + '/' + names[i] + '_list.txt'
+                        dset_path = folder + args.dset + \
+                            '/' + names[i] + '_list.txt'
                         txt_src += open(dset_path).readlines()
 
         if args.dset == 'domainnet':
@@ -175,14 +205,16 @@ def data_load(args):
                 dsize = len(txt_src)
                 tr_size = int(args.split_ratio * dsize)
                 # print(dsize, tr_size, dsize - tr_size)
-                tr_txt, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
+                tr_txt, te_txt = torch.utils.data.random_split(
+                    txt_src, [tr_size, dsize - tr_size])
             elif args.trte == "nosplit":
                 tr_txt = txt_src
                 te_txt = txt_src
             else:
                 dsize = len(txt_src)
                 tr_size = int(args.split_ratio * dsize)
-                _, te_txt = torch.utils.data.random_split(txt_src, [tr_size, dsize - tr_size])
+                _, te_txt = torch.utils.data.random_split(
+                    txt_src, [tr_size, dsize - tr_size])
                 tr_txt = txt_src
 
         dsets["source_tr"] = ImageList(tr_txt, transform=image_train(args))
@@ -200,9 +232,11 @@ def data_load(args):
 
         if args.class_stratified:
             from paws import ClassStratifiedSampler
-            dsets["source_tr"] = ImageList_update(tr_txt, transform=image_train(args))
+            dsets["source_tr"] = ImageList_update(
+                tr_txt, transform=image_train(args))
             sampler = ClassStratifiedSampler(dsets["source_tr"], 1, 0, args.per_class_batch_size, args.class_num,
-                                             epochs=len(dsets["source_tr"]) // (args.per_class_batch_size * args.class_num),
+                                             epochs=len(
+                                                 dsets["source_tr"]) // (args.per_class_batch_size * args.class_num),
                                              seed=args.seed)
             dset_loaders["source_tr"] = DataLoader(dsets["source_tr"], batch_sampler=sampler, num_workers=args.worker,
                                                    shuffle=False)
@@ -245,7 +279,8 @@ def cal_acc(loader, netF, netH, netB, netC, args, flag=False):
 
     all_output = nn.Softmax(dim=1)(all_output)
     _, predict = torch.max(all_output, 1)
-    accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
+    accuracy = torch.sum(torch.squeeze(predict).float() ==
+                         all_label).item() / float(all_label.size()[0])
     mean_ent = torch.mean(loss.Entropy(all_output)).cpu().data.item()
 
     if flag:
@@ -283,10 +318,12 @@ def cal_acc_oda(loader, netF, netB, netC):
 
     all_output = nn.Softmax(dim=1)(all_output)
     _, predict = torch.max(all_output, 1)
-    ent = torch.sum(-all_output * torch.log(all_output + args.epsilon), dim=1) / np.log(args.class_num)
+    ent = torch.sum(-all_output * torch.log(all_output +
+                    args.epsilon), dim=1) / np.log(args.class_num)
     ent = ent.float().cpu()
     initc = np.array([[0], [1]])
-    kmeans = KMeans(n_clusters=2, random_state=0, init=initc, n_init=1).fit(ent.reshape(-1, 1))
+    kmeans = KMeans(n_clusters=2, random_state=0, init=initc,
+                    n_init=1).fit(ent.reshape(-1, 1))
     threshold = (kmeans.cluster_centers_).mean()
 
     predict[ent > threshold] = args.class_num
@@ -302,7 +339,7 @@ def cal_acc_oda(loader, netF, netB, netC):
 
 def train_source(args):
     dset_loaders = data_load(args)
-    ## set base network
+    # set base network
     if args.norm_layer == 'batchnorm':
         norm_layer = nn.BatchNorm2d
     elif args.norm_layer == 'groupnorm':
@@ -320,9 +357,11 @@ def train_source(args):
         netF = network.VGGBase(vgg_name=args.net)
 
     if args.ssl_before_btn:
-        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
+        netH = network.ssl_head(
+            ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
     else:
-        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
+        netH = network.ssl_head(
+            ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
                                        bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
@@ -356,31 +395,40 @@ def train_source(args):
     learning_rate = args.lr
     for k, v in netF.named_parameters():
         if args.separate_wd and ('bias' in k or 'norm' in k):
-            param_group += [{'params': v, 'lr': learning_rate * 0.1, 'weight_decay': 0}]
+            param_group += [{'params': v,
+                             'lr': learning_rate * 0.1, 'weight_decay': 0}]
         else:
-            param_group += [{'params': v, 'lr': learning_rate * 0.1, 'weight_decay': args.weight_decay}]
+            param_group += [{'params': v, 'lr': learning_rate *
+                             0.1, 'weight_decay': args.weight_decay}]
     for k, v in netH.named_parameters():
         if args.separate_wd and ('bias' in k or 'norm' in k):
-            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': 0}]
+            param_group += [{'params': v,
+                             'lr': learning_rate, 'weight_decay': 0}]
         else:
-            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': args.weight_decay}]
+            param_group += [{'params': v, 'lr': learning_rate,
+                             'weight_decay': args.weight_decay}]
     for k, v in netB.named_parameters():
         if args.separate_wd and ('bias' in k or 'norm' in k):
-            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': 0}]
+            param_group += [{'params': v,
+                             'lr': learning_rate, 'weight_decay': 0}]
         else:
-            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': args.weight_decay}]
+            param_group += [{'params': v, 'lr': learning_rate,
+                             'weight_decay': args.weight_decay}]
     for k, v in netC.named_parameters():
         if args.separate_wd and ('bias' in k or 'norm' in k):
-            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': 0}]
+            param_group += [{'params': v,
+                             'lr': learning_rate, 'weight_decay': 0}]
         else:
-            param_group += [{'params': v, 'lr': learning_rate, 'weight_decay': args.weight_decay}]
+            param_group += [{'params': v, 'lr': learning_rate,
+                             'weight_decay': args.weight_decay}]
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
 
     acc_init = 0
     if args.class_stratified:
-        max_iter = args.max_epoch * len(dset_loaders["source_tr"].batch_sampler)
+        max_iter = args.max_epoch * \
+            len(dset_loaders["source_tr"].batch_sampler)
     else:
         max_iter = args.max_epoch * len(dset_loaders["source_tr"])
     interval_iter = max_iter // 10
@@ -393,7 +441,8 @@ def train_source(args):
     netC.train()
 
     if args.use_focal_loss:
-        cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma, reduction='mean')
+        cls_loss_fn = FocalLoss(alpha=args.focal_alpha,
+                                gamma=args.focal_gamma, reduction='mean')
     else:
         if args.ce_weighting:
             w = torch.Tensor(args.ce_weight).cuda()
@@ -401,22 +450,28 @@ def train_source(args):
             if args.smooth == 0:
                 cls_loss_fn = nn.CrossEntropyLoss(weight=w).cuda()
             else:
-                cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth, weight=w).cuda()
+                cls_loss_fn = CrossEntropyLabelSmooth(
+                    num_classes=args.class_num, epsilon=args.smooth, weight=w).cuda()
         else:
             if args.smooth == 0:
                 cls_loss_fn = nn.CrossEntropyLoss().cuda()
             else:
-                cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.smooth).cuda()
+                cls_loss_fn = CrossEntropyLabelSmooth(
+                    num_classes=args.class_num, epsilon=args.smooth).cuda()
 
     if args.ssl_task in ['simclr', 'crs']:
         if args.use_new_ntxent:
-            ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
+            ssl_loss_fn = SupConLoss(
+                temperature=args.temperature, base_temperature=args.temperature).cuda()
         else:
-            ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
+            ssl_loss_fn = NTXentLoss(
+                args.batch_size, args.temperature, True).cuda()
     elif args.ssl_task in ['supcon', 'crsc']:
-        ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
+        ssl_loss_fn = SupConLoss(
+            temperature=args.temperature, base_temperature=args.temperature).cuda()
     elif args.ssl_task == 'ls_supcon':
-        ssl_loss_fn = LabelSmoothedSCLLoss(args.batch_size, args.temperature, args.class_num, args.ssl_smooth)
+        ssl_loss_fn = LabelSmoothedSCLLoss(
+            args.batch_size, args.temperature, args.class_num, args.ssl_smooth)
 
     if args.cr_weight > 0:
         if args.cr_metric == 'cos':
@@ -432,8 +487,10 @@ def train_source(args):
         elif args.cr_metric == 'js':
             dist = JSDivLoss(reduction='sum').cuda()
 
-    use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (args.ssl_weight > 0)
-    use_third_pass = (args.cr_weight > 0) or (args.ssl_task in ['crsc', 'crs'] and args.ssl_weight > 0) or (args.cls3)
+    use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (
+        args.ssl_weight > 0)
+    use_third_pass = (args.cr_weight > 0) or (args.ssl_task in [
+        'crsc', 'crs'] and args.ssl_weight > 0) or (args.cls3)
 
     while iter_num < max_iter:
         try:
@@ -473,6 +530,10 @@ def train_source(args):
         else:
             inputs_source1 = inputs_source.cuda()
 
+        if args.mixup:
+            inputs_source1, y_a, y_b, lam = mixup_data(inputs_source1, labels_source,
+                                                       args.mixup_alpha)
+
         if inputs_source1 is not None:
             f1 = netF(inputs_source1)
             b1 = netB(f1)
@@ -510,9 +571,13 @@ def train_source(args):
             else:
                 raise NotImplementedError
 
-        classifier_loss = cls_loss_fn(outputs_source, labels_source)
-        if args.cls3:
-            classifier_loss += cls_loss_fn(c3, labels_source)
+        if args.mixup:
+            classifier_loss = mixup_criterion(
+                cls_loss_fn, outputs_source, y_a, y_b, lam)
+        else:
+            classifier_loss = cls_loss_fn(outputs_source, labels_source)
+        # if args.cls3:
+        #    classifier_loss += cls_loss_fn(c3, labels_source)
 
         if args.ssl_weight > 0:
             if args.ssl_before_btn:
@@ -553,7 +618,8 @@ def train_source(args):
 
         if args.cr_weight > 0:
             try:
-                cr_loss = dist(f_hard[conf <= args.cr_threshold], f_weak[conf <= args.cr_threshold]).mean()
+                cr_loss = dist(f_hard[conf <= args.cr_threshold],
+                               f_weak[conf <= args.cr_threshold]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
@@ -571,7 +637,8 @@ def train_source(args):
         if args.gent_weight > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_source)
             msoftmax = softmax_out.mean(dim=0)
-            gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
+            gentropy_loss = torch.sum(-msoftmax *
+                                      torch.log(msoftmax + args.epsilon))
             classifier_loss -= args.gent_weight * gentropy_loss
 
         loss = classifier_loss + args.ssl_weight * ssl_loss + args.cr_weight * cr_loss
@@ -586,12 +653,15 @@ def train_source(args):
             netB.eval()
             netC.eval()
             if args.dset == 'visda-c':
-                acc_s_te, acc_list = cal_acc(dset_loaders['source_te'], netF, netH, netB, netC, args, True)
+                acc_s_te, acc_list = cal_acc(
+                    dset_loaders['source_te'], netF, netH, netB, netC, args, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name_src, iter_num, max_iter,
                                                                             acc_s_te) + '\n' + acc_list
             else:
-                acc_s_te, _ = cal_acc(dset_loaders['source_te'], netF, netH, netB, netC, args, False)
-                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name_src, iter_num, max_iter, acc_s_te)
+                acc_s_te, _ = cal_acc(
+                    dset_loaders['source_te'], netF, netH, netB, netC, args, False)
+                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(
+                    args.name_src, iter_num, max_iter, acc_s_te)
             args.out_file.write(log_str + '\n')
             args.out_file.flush()
             print(log_str + '\n')
@@ -625,7 +695,7 @@ def train_source(args):
 
 def test_target(args):
     dset_loaders = data_load(args)
-    ## set base network
+    # set base network
     if args.norm_layer == 'batchnorm':
         norm_layer = nn.BatchNorm2d
     elif args.norm_layer == 'groupnorm':
@@ -642,9 +712,11 @@ def test_target(args):
         netF = network.VGGBase(vgg_name=args.net)
 
     if args.ssl_before_btn:
-        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
+        netH = network.ssl_head(
+            ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
     else:
-        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
+        netH = network.ssl_head(
+            ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
                                        bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
@@ -684,17 +756,22 @@ def test_target(args):
     netC.eval()
 
     if args.da == 'oda':
-        acc_os1, acc_os2, acc_unknown = cal_acc_oda(dset_loaders['test'], netF, netH, netB, netC)
+        acc_os1, acc_os2, acc_unknown = cal_acc_oda(
+            dset_loaders['test'], netF, netH, netB, netC)
         log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}% / {:.2f}% / {:.2f}%'.format(args.trte, args.name,
                                                                                             acc_os2, acc_os1,
                                                                                             acc_unknown)
     else:
         if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
-            acc, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, args, True)
-            log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}%'.format(args.trte, args.name, acc) + '\n' + acc_list
+            acc, acc_list = cal_acc(
+                dset_loaders['test'], netF, netH, netB, netC, args, True)
+            log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}%'.format(
+                args.trte, args.name, acc) + '\n' + acc_list
         else:
-            acc, _ = cal_acc(dset_loaders['test'], netF, netH, netB, netC, args, False)
-            log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}%'.format(args.trte, args.name, acc)
+            acc, _ = cal_acc(dset_loaders['test'],
+                             netF, netH, netB, netC, args, False)
+            log_str = '\nTraining: {}, Task: {}, Accuracy = {:.2f}%'.format(
+                args.trte, args.name, acc)
 
     args.out_file.write(log_str)
     args.out_file.flush()
@@ -710,58 +787,71 @@ def print_args(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SHOT')
-    parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
+    parser.add_argument('--gpu_id', type=str, nargs='?',
+                        default='0', help="device id to run")
     parser.add_argument('--s', type=int, default=0, help="source")
     parser.add_argument('--t', type=int, default=1, help="target")
     parser.add_argument('--split_ratio', type=float, default=0.9)
-    parser.add_argument('--max_epoch', type=int, default=20, help="max iterations")
-    parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
-    parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
+    parser.add_argument('--max_epoch', type=int,
+                        default=20, help="max iterations")
+    parser.add_argument('--batch_size', type=int,
+                        default=64, help="batch_size")
+    parser.add_argument('--scheduler', type=str,
+                        default='default', choices=['default', 'warmupcos'])
     parser.add_argument('--weight_decay', type=float, default=1e-3)
     parser.add_argument('--warmup_ratio', type=float, default=0.1)
-    parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
-    parser.add_argument('--worker', type=int, default=8, help="number of workers")
+    parser.add_argument('--norm_layer', type=str,
+                        default='batchnorm', choices=['batchnorm', 'groupnorm'])
+    parser.add_argument('--worker', type=int, default=8,
+                        help="number of workers")
     parser.add_argument('--dset', type=str, default='office-home',
                         choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C',
                                  'image-clef', 'modern-office', 'domainnet'])
     parser.add_argument('--level', type=int, default=5)
     parser.add_argument('--folder', type=str, default='/SSD/euntae/data/')
     parser.add_argument('--lr', type=float, default=1e-2, help="learning rate")
-    parser.add_argument('--net', type=str, default='resnet50', help="vgg16, resnet50, resnet101")
+    parser.add_argument('--net', type=str, default='resnet50',
+                        help="vgg16, resnet50, resnet101")
     parser.add_argument('--nopretrained', action='store_true')
     parser.add_argument('--seed', type=int, default=2020, help="random seed")
     parser.add_argument('--bottleneck', type=int, default=256)
     parser.add_argument('--epsilon', type=float, default=1e-5)
     parser.add_argument('--layer', type=str, default="wn",
                         choices=["linear", "wn", "angular", 'add_margin', 'arc_margin', 'sphere'])
-    parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
+    parser.add_argument('--classifier', type=str,
+                        default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
     parser.add_argument('--smooth', type=float, default=0.1)
     parser.add_argument('--output', type=str, default='san')
-    parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda', 'oda'])
-    parser.add_argument('--trte', type=str, default='val', choices=['full', 'val', 'nosplit'])
+    parser.add_argument('--da', type=str, default='uda',
+                        choices=['uda', 'pda', 'oda'])
+    parser.add_argument('--trte', type=str, default='val',
+                        choices=['full', 'val', 'nosplit'])
     parser.add_argument('--ssl_task', type=str, default='crsc',
                         choices=['none', 'simclr', 'supcon', 'ls_supcon', 'crsc', 'crs'])
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
-    parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce', 'kl', 'js'])
-    parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
+    parser.add_argument('--cr_metric', type=str, default='cos',
+                        choices=['cos', 'l1', 'l2', 'bce', 'kl', 'js'])
+    parser.add_argument('--cr_site', type=str, default='btn',
+                        choices=['feat', 'btn', 'cls'])
     parser.add_argument('--cr_threshold', type=float, default=1.0)
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')
-    parser.add_argument('--norm_img_mode', type=str, choices=['whitening', 'pmone'], default='whitening')
+    parser.add_argument('--norm_img_mode', type=str,
+                        choices=['whitening', 'pmone'], default='whitening')
     parser.add_argument('--norm_feat', action='store_true')
     parser.add_argument('--norm_btn', action='store_true')
     parser.add_argument('--embedding_dim', type=int, default=128)
-    parser.add_argument('--aug1', type=str, default='simclr', 
-    choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
-    parser.add_argument('--aug2', type=str, default='simclr', 
-    choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
-    parser.add_argument('--aug3', type=str, default='weak', 
-    choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
+    parser.add_argument('--aug1', type=str, default='simclr',
+                        choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
+    parser.add_argument('--aug2', type=str, default='simclr',
+                        choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
+    parser.add_argument('--aug3', type=str, default='weak',
+                        choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
     parser.add_argument('--ra_n', type=int, default=1)
     parser.add_argument('--ra_m', type=int, default=10)
     parser.add_argument('--sg3', type=str2bool, default=True)
@@ -772,7 +862,8 @@ if __name__ == "__main__":
     parser.add_argument('--nojitter', action='store_true')
     parser.add_argument('--nograyscale', action='store_true')
     parser.add_argument('--nogaussblur', action='store_true')
-    parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
+    parser.add_argument('--disable_aug_for_shape',
+                        type=str2bool, default=False)
 
     parser.add_argument('--dropout_1', type=float, default=0.0)
     parser.add_argument('--dropout_2', type=float, default=0.0)
@@ -804,6 +895,9 @@ if __name__ == "__main__":
     parser.add_argument('--multisource', type=str2bool, default=False)
 
     parser.add_argument('--aug_prob_mult', type=float, default=1.0)
+
+    parser.add_argument('--mixup', type=str2bool, default=False)
+    parser.add_argument('--mixup-alpha', type=float, default=1.0)
 
     args = parser.parse_args()
 
@@ -839,7 +933,8 @@ if __name__ == "__main__":
         names = ['c', 'i', 'p']
         args.class_num = 12
     if args.dset == 'domainnet':
-        names = ['clipart', 'infograph', 'painting', 'quickdraw', 'real', 'sketch']
+        names = ['clipart', 'infograph', 'painting',
+                 'quickdraw', 'real', 'sketch']
         args.class_num = 345
 
     args.names = names
@@ -869,23 +964,31 @@ if __name__ == "__main__":
             args.tar_classes = [i for i in range(65)]
 
     if args.dset in ['CIFAR-10-C', 'CIFAR-100-C']:
-        args.output_dir_src = osp.join(args.output, args.da, args.dset, 'source')
+        args.output_dir_src = osp.join(
+            args.output, args.da, args.dset, 'source')
         args.name_src = 'source'
     else:
         if not args.multisource:
-            args.output_dir_src = osp.join(args.output, args.da, args.dset, names[args.s][0].upper())
+            args.output_dir_src = osp.join(
+                args.output, args.da, args.dset, names[args.s][0].upper())
             args.name_src = names[args.s][0].upper()
         else:
-            args.output_dir_src = osp.join(args.output, args.da, args.dset, names[args.t][0].upper())
+            args.output_dir_src = osp.join(
+                args.output, args.da, args.dset, names[args.t][0].upper())
             args.name_src = names[args.t][0].upper()
 
         if args.dset == 'domainnet':
-            args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_train.txt'
-            args.s_dset_test_path = folder + args.dset + '/' + names[args.s] + '_test.txt'
-            args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_test.txt'
+            args.s_dset_path = folder + args.dset + \
+                '/' + names[args.s] + '_train.txt'
+            args.s_dset_test_path = folder + args.dset + \
+                '/' + names[args.s] + '_test.txt'
+            args.test_dset_path = folder + args.dset + \
+                '/' + names[args.t] + '_test.txt'
         else:
-            args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
-            args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
+            args.s_dset_path = folder + args.dset + \
+                '/' + names[args.s] + '_list.txt'
+            args.test_dset_path = folder + args.dset + \
+                '/' + names[args.t] + '_list.txt'
 
     if not osp.exists(args.output_dir_src):
         os.system('mkdir -p ' + args.output_dir_src)
@@ -908,7 +1011,8 @@ if __name__ == "__main__":
             else:
                 args.t = i
                 args.name = 'MS_' + names[args.t][0].upper()
-                args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
+                args.test_dset_path = folder + args.dset + \
+                    '/' + names[args.t] + '_list.txt'
         else:
             if i == args.s:
                 continue
@@ -917,12 +1021,17 @@ if __name__ == "__main__":
 
             folder = args.folder
             if args.dset == 'domainnet':
-                args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_train.txt'
-                args.s_dset_test_path = folder + args.dset + '/' + names[args.s] + '_test.txt'
-                args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
+                args.s_dset_path = folder + args.dset + \
+                    '/' + names[args.s] + '_train.txt'
+                args.s_dset_test_path = folder + args.dset + \
+                    '/' + names[args.s] + '_test.txt'
+                args.test_dset_path = folder + args.dset + \
+                    '/' + names[args.t] + '_list.txt'
             else:
-                args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
-                args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
+                args.s_dset_path = folder + args.dset + \
+                    '/' + names[args.s] + '_list.txt'
+                args.test_dset_path = folder + args.dset + \
+                    '/' + names[args.t] + '_list.txt'
 
             if args.dset == 'office-home':
                 if args.disable_aug_for_shape:
