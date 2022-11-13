@@ -1,5 +1,6 @@
 import argparse
-import os, sys
+import os
+import sys
 import os.path as osp
 import torchvision
 import numpy as np
@@ -8,12 +9,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import transforms, datasets
-import network, loss
+import network
+import loss
 from torch.utils.data import DataLoader
 from data_list import ImageList, ImageList_idx, CIFAR10_idx
 from data import *
 from loss import NTXentLoss, SupConLoss, CrossEntropyLabelSmooth, LabelSmoothedSCLLoss, FocalLoss, JSDivLoss
-import random, pdb, math, copy
+import random
+import pdb
+import math
+import copy
 from tqdm import tqdm
 from scipy.spatial.distance import cdist
 from sklearn.metrics import confusion_matrix
@@ -47,7 +52,8 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
         if iter_num < warmup_iter:
             decay = iter_num / warmup_iter
         else:
-            decay = np.cos((iter_num - warmup_iter) * np.pi / (2 * (max_iter - warmup_iter)))
+            decay = np.cos((iter_num - warmup_iter) * np.pi /
+                           (2 * (max_iter - warmup_iter)))
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr0'] * decay
         #param_group['weight_decay'] = args.weight_decay
@@ -56,8 +62,27 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
     return optimizer
 
 
+def mixup_data(x, y, alpha=1.0):
+    '''Returns mixed inputs, pairs of targets, and lambda'''
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    batch_size = x.size()[0]
+    index = torch.randperm(batch_size)
+
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+
+def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
 def data_load(args):
-    ## prepare data
+    # prepare data
     dsets = {}
     dset_loaders = {}
     train_bs = args.batch_size
@@ -104,7 +129,8 @@ def data_load(args):
                 reci = rec.strip().split(' ')
                 if int(reci[1]) in args.tar_classes:
                     if int(reci[1]) in args.src_classes:
-                        line = reci[0] + ' ' + str(label_map_s[int(reci[1])]) + '\n'
+                        line = reci[0] + ' ' + \
+                            str(label_map_s[int(reci[1])]) + '\n'
                         new_tar.append(line)
                     else:
                         line = reci[0] + ' ' + str(len(label_map_s)) + '\n'
@@ -146,8 +172,10 @@ def cal_acc(loader, netF, netH, netB, netC, flag=False):
                 all_output = torch.cat((all_output, outputs.float().cpu()), 0)
                 all_label = torch.cat((all_label, labels.float()), 0)
     _, predict = torch.max(all_output, 1)
-    accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
-    mean_ent = torch.mean(loss.Entropy(nn.Softmax(dim=1)(all_output))).cpu().data.item()
+    accuracy = torch.sum(torch.squeeze(predict).float() ==
+                         all_label).item() / float(all_label.size()[0])
+    mean_ent = torch.mean(loss.Entropy(
+        nn.Softmax(dim=1)(all_output))).cpu().data.item()
 
     if flag:
         matrix = confusion_matrix(all_label, torch.squeeze(predict).float())
@@ -162,7 +190,7 @@ def cal_acc(loader, netF, netH, netB, netC, flag=False):
 
 def train_target(args):
     dset_loaders = data_load(args)
-    ## set base network
+    # set base network
     if args.norm_layer == 'batchnorm':
         norm_layer = nn.BatchNorm2d
     elif args.norm_layer == 'groupnorm':
@@ -181,9 +209,11 @@ def train_target(args):
 
     # print(args.ssl_before_btn)
     if args.ssl_before_btn:
-        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
+        netH = network.ssl_head(
+            ssl_task=args.ssl_task, feature_dim=netF.in_features, embedding_dim=args.embedding_dim)
     else:
-        netH = network.ssl_head(ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
+        netH = network.ssl_head(
+            ssl_task=args.ssl_task, feature_dim=args.bottleneck, embedding_dim=args.embedding_dim)
     if args.bottleneck != 0:
         netB = network.feat_bootleneck(type=args.classifier, feature_dim=netF.in_features,
                                        bottleneck_dim=args.bottleneck, norm_btn=args.norm_btn)
@@ -214,8 +244,8 @@ def train_target(args):
     modelpath = args.output_dir_src + '/source_C.pt'
     netC.load_state_dict(torch.load(modelpath), strict=False)
     cls_weights = copy.deepcopy(netC.fc.weight.data).numpy()
-    #netC.eval()
-    #for k, v in netC.named_parameters():
+    # netC.eval()
+    # for k, v in netC.named_parameters():
     #    v.requires_grad = False
 
     if args.dataparallel:
@@ -236,25 +266,31 @@ def train_target(args):
     for k, v in netF.named_parameters():
         if args.lr_decay1 > 0:
             if args.separate_wd and ('bias' in k or 'norm' in k):
-                param_group += [{'params': v, 'lr': args.lr * args.lr_decay1, 'weight_decay': 0}]
+                param_group += [{'params': v, 'lr': args.lr *
+                                 args.lr_decay1, 'weight_decay': 0}]
             else:
-                param_group += [{'params': v, 'lr': args.lr * args.lr_decay1, 'weight_decay': args.weight_decay}]
+                param_group += [{'params': v, 'lr': args.lr *
+                                 args.lr_decay1, 'weight_decay': args.weight_decay}]
         else:
             v.requires_grad = False
     for k, v in netB.named_parameters():
         if args.lr_decay2 > 0:
             if args.separate_wd and ('bias' in k or 'norm' in k):
-                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': 0}]
+                param_group += [{'params': v, 'lr': args.lr *
+                                 args.lr_decay2, 'weight_decay': 0}]
             else:
-                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': args.weight_decay}]
+                param_group += [{'params': v, 'lr': args.lr *
+                                 args.lr_decay2, 'weight_decay': args.weight_decay}]
         else:
             v.requires_grad = False
     for k, v in netH.named_parameters():
         if args.lr_decay2 > 0:
             if args.separate_wd and ('bias' in k or 'norm' in k):
-                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': 0}]
+                param_group += [{'params': v, 'lr': args.lr *
+                                 args.lr_decay2, 'weight_decay': 0}]
             else:
-                param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': args.weight_decay}]
+                param_group += [{'params': v, 'lr': args.lr *
+                                 args.lr_decay2, 'weight_decay': args.weight_decay}]
         else:
             v.requires_grad = False
 
@@ -263,26 +299,33 @@ def train_target(args):
         for k, v in netC.named_parameters():
             if args.lr_decay2 > 0:
                 if args.separate_wd and ('bias' in k or 'norm' in k):
-                    c_param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': 0}]
+                    c_param_group += [{'params': v, 'lr': args.lr *
+                                       args.lr_decay2, 'weight_decay': 0}]
                 else:
-                    c_param_group += [{'params': v, 'lr': args.lr * args.lr_decay2, 'weight_decay': args.weight_decay}]
+                    c_param_group += [{'params': v, 'lr': args.lr *
+                                       args.lr_decay2, 'weight_decay': args.weight_decay}]
             else:
                 v.requires_grad = False
 
     if args.use_focal_loss:
-        cls_loss_fn = FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma, reduction='mean')
+        cls_loss_fn = FocalLoss(alpha=args.focal_alpha,
+                                gamma=args.focal_gamma, reduction='mean')
     else:
         if args.cls_smooth == 0:
             cls_loss_fn = nn.CrossEntropyLoss()
         else:
-            cls_loss_fn = CrossEntropyLabelSmooth(num_classes=args.class_num, epsilon=args.cls_smooth)
+            cls_loss_fn = CrossEntropyLabelSmooth(
+                num_classes=args.class_num, epsilon=args.cls_smooth)
 
     if args.ssl_task in ['simclr', 'crs']:
-        ssl_loss_fn = NTXentLoss(args.batch_size, args.temperature, True).cuda()
+        ssl_loss_fn = NTXentLoss(
+            args.batch_size, args.temperature, True).cuda()
     elif args.ssl_task in ['supcon', 'crsc']:
-        ssl_loss_fn = SupConLoss(temperature=args.temperature, base_temperature=args.temperature).cuda()
+        ssl_loss_fn = SupConLoss(
+            temperature=args.temperature, base_temperature=args.temperature).cuda()
     elif args.ssl_task == 'ls_supcon':
-        ssl_loss_fn = LabelSmoothedSCLLoss(args.batch_size, args.temperature, args.class_num, args.ssl_smooth)
+        ssl_loss_fn = LabelSmoothedSCLLoss(
+            args.batch_size, args.temperature, args.class_num, args.ssl_smooth)
 
     if args.cr_weight > 0:
         if args.cr_metric == 'cos':
@@ -298,8 +341,10 @@ def train_target(args):
         elif args.cr_metric == 'js':
             dist = JSDivLoss(reduction='sum').cuda()
 
-    use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (args.ssl_weight > 0)
-    use_third_pass = (args.cr_weight > 0) or (args.ssl_task in ['crsc', 'crs'] and args.ssl_weight > 0) or (args.cls3)
+    use_second_pass = (args.ssl_task in ['simclr', 'supcon', 'ls_supcon']) and (
+        args.ssl_weight > 0)
+    use_third_pass = (args.cr_weight > 0) or (args.ssl_task in [
+        'crsc', 'crs'] and args.ssl_weight > 0) or (args.cls3)
 
     optimizer = optim.SGD(param_group)
     optimizer = op_copy(optimizer)
@@ -326,7 +371,8 @@ def train_target(args):
             ent, gent = maxent_step(inputs, netF, netH, netB, netC, optimizer)
             memax_iter += 1
             if memax_iter % args.memax_print_freq == 0:
-                print("Iter {:3d}/{:3d} Ent {:.3f} Gent {:.3f}".format(memax_iter, memax_max_iter, ent, gent))
+                print(
+                    "Iter {:3d}/{:3d} Ent {:.3f} Gent {:.3f}".format(memax_iter, memax_max_iter, ent, gent))
 
         optimizer = optim.SGD(param_group)
         optimizer = op_copy(optimizer)
@@ -362,10 +408,11 @@ def train_target(args):
                 eval_off = iter_num == 0
             else:
                 eval_off = True
-            mem_label, mem_conf, centroids, labelset = obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args,
-                                                                    mem_label, eval_off)
+            mem_label, mem_second_label, mem_conf, centroids, labelset = \
+                obtain_label(dset_loaders['pl'], netF, netH, netB, netC, args,
+                             mem_label, eval_off)
             mem_label = torch.from_numpy(mem_label).cuda()
-
+            mem_second_label = torch.from_numpy(mem_second_label).cuda()
             netF.train()
             netH.train()
             netB.train()
@@ -378,10 +425,12 @@ def train_target(args):
         if iter_num == 0 and args.calibrate_cls_weights:
             if args.dataparallel:
                 device = netC.module.fc.weight.device
-                netC.module.fc.weight.data = torch.from_numpy(centroids).float().to(device)
+                netC.module.fc.weight.data = torch.from_numpy(
+                    centroids).float().to(device)
             else:
                 device = netC.fc.weight.device
-                netC.fc.weight.data = torch.from_numpy(centroids).float().to(device)
+                netC.fc.weight.data = torch.from_numpy(
+                    centroids).float().to(device)
 
         inputs_test1 = None
         inputs_test2 = None
@@ -391,6 +440,7 @@ def train_target(args):
             pred = labels_test.cuda()
         else:
             pred = mem_label[tar_idx]
+            second_pred = mem_second_label[tar_idx]
 
         if iter_num < args.initial_btn_iter:
             netF.eval()
@@ -419,6 +469,10 @@ def train_target(args):
         else:
             inputs_test1 = inputs_test.cuda()
 
+        if args.mixup:
+            inputs_test1, y_a, y_b, lam = mixup_data(inputs_test1, pred,
+                                                     args.mixup_alpha)
+
         if args.layer in ['add_margin', 'arc_margin', 'sphere'] and args.use_margin_forward:
             labels_forward = pred
         else:
@@ -445,7 +499,8 @@ def train_target(args):
                 conf = torch.max(F.softmax(c3, dim=1), dim=1)[0]
 
         iter_num += 1
-        lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter, gamma=args.gamma, power=args.power)
+        lr_scheduler(args, optimizer, iter_num=iter_num,
+                     max_iter=max_iter, gamma=args.gamma, power=args.power)
 
         if args.cr_weight > 0:
             if args.cr_site == 'feat':
@@ -470,6 +525,9 @@ def train_target(args):
             #    conf = conf.cpu().numpy()
             conf_cls = mem_conf[tar_idx]
 
+            if args.mixup:
+                classifier_loss = mixup_criterion(
+                    cls_loss_fn, outputs_test, y_a, y_b, lam)
             classifier_loss = cls_loss_fn(outputs_test[conf_cls >= args.conf_threshold],
                                           pred[conf_cls >= args.conf_threshold])
             if args.cls3:
@@ -495,7 +553,8 @@ def train_target(args):
             with torch.set_grad_enabled(not args.freeze_ccc):
                 c_ccc = F.normalize(b, dim=1) @ centroids.T / args.ccc_temp
 
-            classifier_loss += args.cls_dis_weight * JSDivLoss(reduction='sum')(c, c_ccc)
+            classifier_loss += args.cls_dis_weight * \
+                JSDivLoss(reduction='sum')(c, c_ccc)
 
         if args.ent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
@@ -511,7 +570,8 @@ def train_target(args):
         if args.gent_par > 0:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
             msoftmax = softmax_out.mean(dim=0)
-            gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
+            gentropy_loss = torch.sum(-msoftmax *
+                                      torch.log(msoftmax + args.epsilon))
             classifier_loss -= args.gent_par * gentropy_loss
 
         if args.ssl_weight > 0:
@@ -549,9 +609,11 @@ def train_target(args):
         if args.cr_weight > 0:
             try:
                 if args.sg3_cr and not args.sg3:
-                    cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak.detach()[conf >= args.cr_threshold]).mean()
+                    cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak.detach()[
+                                   conf >= args.cr_threshold]).mean()
                 else:
-                    cr_loss = dist(f_hard[conf >= args.cr_threshold], f_weak[conf >= args.cr_threshold]).mean()
+                    cr_loss = dist(
+                        f_hard[conf >= args.cr_threshold], f_weak[conf >= args.cr_threshold]).mean()
 
                 if args.cr_metric == 'cos':
                     cr_loss *= -1
@@ -581,7 +643,8 @@ def train_target(args):
             with torch.set_grad_enabled(not args.freeze_ccc):
                 c_ccc = F.normalize(b1, dim=1) @ centroids.T / args.ccc_temp
 
-            cls_dis_loss = args.cls_dis_weight * JSDivLoss(reduction='sum')(c1, c_ccc)
+            cls_dis_loss = args.cls_dis_weight * \
+                JSDivLoss(reduction='sum')(c1, c_ccc)
             c_optimizer.zero_grad()
             cls_dis_loss.backward()
             c_optimizer.step()
@@ -591,12 +654,15 @@ def train_target(args):
             netH.eval()
             netB.eval()
             if args.dset in ['visda-c', 'CIFAR-10-C', 'CIFAR-100-C']:
-                acc_s_te, acc_list = cal_acc(dset_loaders['test'], netF, netH, netB, netC, True)
+                acc_s_te, acc_list = cal_acc(
+                    dset_loaders['test'], netF, netH, netB, netC, True)
                 log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter,
                                                                             acc_s_te) + '\n' + acc_list
             else:
-                acc_s_te, _ = cal_acc(dset_loaders['test'], netF, netH, netB, netC, False)
-                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(args.name, iter_num, max_iter, acc_s_te)
+                acc_s_te, _ = cal_acc(
+                    dset_loaders['test'], netF, netH, netB, netC, False)
+                log_str = 'Task: {}, Iter:{}/{}; Accuracy = {:.2f}%'.format(
+                    args.name, iter_num, max_iter, acc_s_te)
 
             args.out_file.write(log_str + '\n')
             args.out_file.flush()
@@ -607,15 +673,23 @@ def train_target(args):
 
     if args.issave:
         if args.dataparallel:
-            torch.save(netF.module.state_dict(), osp.join(args.output_dir, "target_F_" + args.savename + ".pt"))
-            torch.save(netH.module.state_dict(), osp.join(args.output_dir, "target_H_" + args.savename + ".pt"))
-            torch.save(netB.module.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
-            torch.save(netC.module.state_dict(), osp.join(args.output_dir, "target_C_" + args.savename + ".pt"))
+            torch.save(netF.module.state_dict(), osp.join(
+                args.output_dir, "target_F_" + args.savename + ".pt"))
+            torch.save(netH.module.state_dict(), osp.join(
+                args.output_dir, "target_H_" + args.savename + ".pt"))
+            torch.save(netB.module.state_dict(), osp.join(
+                args.output_dir, "target_B_" + args.savename + ".pt"))
+            torch.save(netC.module.state_dict(), osp.join(
+                args.output_dir, "target_C_" + args.savename + ".pt"))
         else:
-            torch.save(netF.state_dict(), osp.join(args.output_dir, "target_F_" + args.savename + ".pt"))
-            torch.save(netH.state_dict(), osp.join(args.output_dir, "target_H_" + args.savename + ".pt"))
-            torch.save(netB.state_dict(), osp.join(args.output_dir, "target_B_" + args.savename + ".pt"))
-            torch.save(netC.state_dict(), osp.join(args.output_dir, "target_C_" + args.savename + ".pt"))
+            torch.save(netF.state_dict(), osp.join(
+                args.output_dir, "target_F_" + args.savename + ".pt"))
+            torch.save(netH.state_dict(), osp.join(
+                args.output_dir, "target_H_" + args.savename + ".pt"))
+            torch.save(netB.state_dict(), osp.join(
+                args.output_dir, "target_B_" + args.savename + ".pt"))
+            torch.save(netC.state_dict(), osp.join(
+                args.output_dir, "target_C_" + args.savename + ".pt"))
 
     return netF, netH, netB, netC
 
@@ -686,19 +760,23 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
     if args.pl_type == 'naive':
         all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
         conf, predict = torch.max(all_output, 1)
-        accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
+        accuracy = torch.sum(torch.squeeze(predict).float(
+        ) == all_label).item() / float(all_label.size()[0])
         pred_label = torch.squeeze(predict).numpy()
     elif args.pl_type in ['kmeans', 'spherical_kmeans']:
         if args.init_centroids_with_cls:
             try:
-                weights = copy.deepcopy(netC.module.fc.weight.data).detach().cpu().numpy()
+                weights = copy.deepcopy(
+                    netC.module.fc.weight.data).detach().cpu().numpy()
             except:
-                weights = copy.deepcopy(netC.fc.weight.data).detach().cpu().numpy()
+                weights = copy.deepcopy(
+                    netC.fc.weight.data).detach().cpu().numpy()
         else:
             weights = 'k-means++'
         all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
         conf, predict = torch.max(all_output, 1)
-        accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
+        accuracy = torch.sum(torch.squeeze(predict).float(
+        ) == all_label).item() / float(all_label.size()[0])
 
         conf_thres_idx = np.where(conf >= args.pl_threshold)
         if args.pl_type in ['spherical_kmeans', 'spherical_kmeans_old']:
@@ -723,7 +801,12 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         initc = kmeans.cluster_centers_
 
         cdists = cdist(all_fea, initc, metric='cosine')
-        pred_label = cdists.argmin(axis=1)
+
+        ksmallest = cdists.argpartition(axis=1, kth=2)
+
+        #pred_label = cdists.argmin(axis=1)
+        pred_label = ksmallest[:, 0]
+        second_label = ksmallest[:, 1]
         conf = softmax((1 - cdists) / args.pl_temperature, axis=1).max(axis=1)
         cls_count = np.eye(args.class_num)[pred_label].sum(axis=0)
         labelset = np.where(cls_count > args.threshold)
@@ -734,18 +817,23 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         elif args.pl_weight_term == 'ls':
             all_output = nn.Softmax(dim=1)(all_output / args.pl_temperature)
             pred = torch.argmax(all_output, dim=1)
-            all_output = torch.ones(all_output.size(0), args.class_num) * args.pl_smooth / args.class_num
-            all_output[range(all_output.size(0)), pred] = (1. - args.pl_smooth) + args.pl_smooth / args.class_num
+            all_output = torch.ones(all_output.size(
+                0), args.class_num) * args.pl_smooth / args.class_num
+            all_output[range(all_output.size(0)), pred] = (
+                1. - args.pl_smooth) + args.pl_smooth / args.class_num
         elif args.pl_weight_term == 'uniform':
-            all_output = torch.ones(all_output.size(0), args.class_num) / args.class_num
+            all_output = torch.ones(all_output.size(
+                0), args.class_num) / args.class_num
         else:
             raise NotImplementedError
-        ent = torch.sum(-all_output * torch.log(all_output + args.epsilon), dim=1)
+        ent = torch.sum(-all_output *
+                        torch.log(all_output + args.epsilon), dim=1)
         unknown_weight = 1 - ent / np.log(args.class_num)
         conf, predict = torch.max(all_output, 1)
         # print('predict', predict.size())
 
-        accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
+        accuracy = torch.sum(torch.squeeze(predict).float(
+        ) == all_label).item() / float(all_label.size()[0])
         if args.distance == 'cosine':
             # all_fea = torch.cat((all_fea, torch.ones(all_fea.size(0), 1)), 1)
             all_fea = (all_fea.t() / torch.norm(all_fea, p=2, dim=1)).t()
@@ -760,16 +848,24 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         # print(labelset)
 
         dd = cdist(all_fea, initc[labelset], args.distance)
-        pred_label = dd.argmin(axis=1)
+
+        ksmallest = dd.argpartition(axis=1, kth=2)[:2]
+        #pred_label = dd.argmin(axis=1)
+        pred_label = ksmallest[:, 0]
         pred_label = labelset[pred_label]
+        second_label = ksmallest[:, 1]
+        second_label = labelset[second_label]
 
         for round in range(args.pl_rounds):
             aff = np.eye(K)[pred_label]
             c = aff.transpose().dot(all_fea)
             c = c / (1e-8 + aff.sum(axis=0)[:, None])
             dd = cdist(all_fea, c[labelset], args.distance)
-            pred_label = dd.argmin(axis=1)
+            ksmallest = dd.argpartition(axis=1, kth=2)[:2]
+            pred_label = ksmallest[0]
             pred_label = labelset[pred_label]
+            second_label = ksmallest[1]
+            second_label = labelset[second_label]
 
     acc = np.sum(pred_label == all_label.float().numpy()) / len(all_fea)
     log_str = 'Accuracy = {:.2f}% -> {:.2f}%'.format(accuracy * 100, acc * 100)
@@ -787,14 +883,16 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         m = args.momentum_cls
         device = inputs.get_device()
         if args.dataparallel:
-            netC.module.fc.weight.data = m * netC.module.fc.weight.data + (1-m) * torch.from_numpy(centroids).float().to(device)
+            netC.module.fc.weight.data = m * netC.module.fc.weight.data + \
+                (1-m) * torch.from_numpy(centroids).float().to(device)
         else:
-            netC.fc.weight.data = m * netC.fc.weight.data + (1-m) * torch.from_numpy(centroids).float().to(device)
+            netC.fc.weight.data = m * netC.fc.weight.data + \
+                (1-m) * torch.from_numpy(centroids).float().to(device)
 
     try:
-        return pred_label.astype('int'), conf.cpu().numpy(), centroids, labelset
+        return pred_label.astype('int'), second_label.astype('int'), conf.cpu().numpy(), centroids, labelset
     except:
-        return pred_label.astype('int'), conf, centroids, labelset
+        return pred_label.astype('int'), second_label.astype('int'), conf, centroids, labelset
 
 
 def calibrate_bn_stats(loader, netF, netB, args):
@@ -834,27 +932,34 @@ def calibrate_bn_stats(loader, netF, netB, args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SHOT')
-    parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
+    parser.add_argument('--gpu_id', type=str, nargs='?',
+                        default='0', help="device id to run")
     parser.add_argument('--s', type=int, default=0, help="source")
     parser.add_argument('--t', type=int, default=1, help="target")
-    parser.add_argument('--max_epoch', type=int, default=15, help="max iterations")
+    parser.add_argument('--max_epoch', type=int,
+                        default=15, help="max iterations")
     parser.add_argument('--interval', type=int, default=15)
-    parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
+    parser.add_argument('--batch_size', type=int,
+                        default=64, help="batch_size")
     parser.add_argument('--eval_batch_mult', type=int, default=8)
-    parser.add_argument('--scheduler', type=str, default='default', choices=['default', 'warmupcos'])
+    parser.add_argument('--scheduler', type=str,
+                        default='default', choices=['default', 'warmupcos'])
     parser.add_argument('--gamma', type=float, default=10)
     parser.add_argument('--power', type=float, default=0.75)
     parser.add_argument('--weight_decay', type=float, default=1e-3)
     parser.add_argument('--warmup_ratio', type=float, default=0.1)
-    parser.add_argument('--norm_layer', type=str, default='batchnorm', choices=['batchnorm', 'groupnorm'])
-    parser.add_argument('--worker', type=int, default=4, help="number of workers")
+    parser.add_argument('--norm_layer', type=str,
+                        default='batchnorm', choices=['batchnorm', 'groupnorm'])
+    parser.add_argument('--worker', type=int, default=4,
+                        help="number of workers")
     parser.add_argument('--dset', type=str, default='office-home',
                         choices=['visda-c', 'office', 'office-home', 'office-caltech', 'CIFAR-10-C', 'CIFAR-100-C',
                                  'image-clef', 'modern-office'])
     parser.add_argument('--level', type=int, default=5)
     parser.add_argument('--folder', type=str, default='/SSD/euntae/data/')
     parser.add_argument('--lr', type=float, default=1e-2, help="learning rate")
-    parser.add_argument('--net', type=str, default='resnet50', help="alexnet, vgg16, resnet50, res101")
+    parser.add_argument('--net', type=str, default='resnet50',
+                        help="alexnet, vgg16, resnet50, res101")
     parser.add_argument('--nopretrained', action='store_true')
     parser.add_argument('--seed', type=int, default=2020, help="random seed")
 
@@ -872,15 +977,18 @@ if __name__ == "__main__":
     parser.add_argument('--epsilon', type=float, default=1e-5)
     parser.add_argument('--layer', type=str, default="wn",
                         choices=["linear", "wn", "angular", 'add_margin', 'arc_margin', 'sphere'])
-    parser.add_argument('--classifier', type=str, default="bn", choices=["ori", "bn", "ln"])
+    parser.add_argument('--classifier', type=str,
+                        default="bn", choices=["ori", "bn", "ln"])
     parser.add_argument('--classifier_bias_off', action='store_true')
-    parser.add_argument('--distance', type=str, default='cosine', choices=["euclidean", "cosine"])
+    parser.add_argument('--distance', type=str,
+                        default='cosine', choices=["euclidean", "cosine"])
     parser.add_argument('--pl_type', type=str, default="sspl",
-        choices=["naive", "sspl", "kmeans", "spherical_kmeans", "spherical_kmeans_old"])
+                        choices=["naive", "sspl", "kmeans", "spherical_kmeans", "spherical_kmeans_old"])
     parser.add_argument('--weighted_samples', type=str2bool, default=False)
     parser.add_argument('--output', type=str, default='san')
     parser.add_argument('--output_src', type=str, default='san')
-    parser.add_argument('--da', type=str, default='uda', choices=['uda', 'pda'])
+    parser.add_argument('--da', type=str, default='uda',
+                        choices=['uda', 'pda'])
     parser.add_argument('--issave', type=bool, default=True)
 
     parser.add_argument('--ssl_task', type=str, default='crsc',
@@ -888,28 +996,34 @@ if __name__ == "__main__":
     parser.add_argument('--ssl_weight', type=float, default=0.1)
     parser.add_argument('--ssl_smooth', type=float, default=0.1)
     parser.add_argument('--cr_weight', type=float, default=0.0)
-    parser.add_argument('--cr_metric', type=str, default='cos', choices=['cos', 'l1', 'l2', 'bce', 'kl', 'js'])
-    parser.add_argument('--cr_site', type=str, default='btn', choices=['feat', 'btn', 'cls'])
+    parser.add_argument('--cr_metric', type=str, default='cos',
+                        choices=['cos', 'l1', 'l2', 'bce', 'kl', 'js'])
+    parser.add_argument('--cr_site', type=str, default='btn',
+                        choices=['feat', 'btn', 'cls'])
     parser.add_argument('--cr_threshold', type=float, default=0.0)
     parser.add_argument('--angular_temp', type=float, default=0.1)
     parser.add_argument('--conf_threshold', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')
-    parser.add_argument('--norm_img_mode', type=str, choices=['whitening', 'pmone'], default='whitening')
+    parser.add_argument('--norm_img_mode', type=str,
+                        choices=['whitening', 'pmone'], default='whitening')
     parser.add_argument('--norm_feat', action='store_true')
     parser.add_argument('--norm_btn', action='store_true')
     parser.add_argument('--embedding_dim', type=int, default=128)
     parser.add_argument('--pl_rounds', type=int, default=1)
-    parser.add_argument('--pl_weight_term', type=str, default='softmax', choices=['softmax', 'naive', 'ls', 'uniform'])
+    parser.add_argument('--pl_weight_term', type=str, default='softmax',
+                        choices=['softmax', 'naive', 'ls', 'uniform'])
     parser.add_argument('--pl_smooth', type=float, default=0.1)
     parser.add_argument('--pl_temperature', type=float, default=1.0)
-    parser.add_argument('--aug1', type=str, default='simclr', 
-        choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
-    parser.add_argument('--aug2', type=str, default='simclr', 
-        choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
-    parser.add_argument('--aug3', type=str, default='weak', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
-    parser.add_argument('--aug_pl', type=str, default='test', choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug1', type=str, default='simclr',
+                        choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
+    parser.add_argument('--aug2', type=str, default='simclr',
+                        choices=['none', 'weak', 'simclr', 'randaug', 'test', 'augmix', 'trivial'])
+    parser.add_argument('--aug3', type=str, default='weak',
+                        choices=['none', 'weak', 'simclr', 'randaug', 'test'])
+    parser.add_argument('--aug_pl', type=str, default='test',
+                        choices=['none', 'weak', 'simclr', 'randaug', 'test'])
     parser.add_argument('--ra_n', type=int, default=1)
     parser.add_argument('--ra_m', type=int, default=10)
     parser.add_argument('--sg3', type=str2bool, default=True)
@@ -922,7 +1036,8 @@ if __name__ == "__main__":
     parser.add_argument('--nograyscale', action='store_true')
     parser.add_argument('--nogaussblur', action='store_true')
     parser.add_argument('--duplicated', default=False, type=str2bool)
-    parser.add_argument('--disable_aug_for_shape', type=str2bool, default=False)
+    parser.add_argument('--disable_aug_for_shape',
+                        type=str2bool, default=False)
 
     parser.add_argument('--dropout_1', type=float, default=0)
     parser.add_argument('--dropout_2', type=float, default=0)
@@ -939,16 +1054,20 @@ if __name__ == "__main__":
     parser.add_argument('--initial_btn_iter', type=int, default=0)
     parser.add_argument('--reset_running_stats', type=str2bool, default=False)
     parser.add_argument('--reset_bn_params', type=str2bool, default=False)
-    parser.add_argument('--f_calibrate_mode', type=str, choices=['none', 'reset', 'offline', 'mixed'], default='none')
-    parser.add_argument('--b_calibrate_mode', type=str, choices=['none', 'reset', 'offline', 'mixed'], default='none')
+    parser.add_argument('--f_calibrate_mode', type=str,
+                        choices=['none', 'reset', 'offline', 'mixed'], default='none')
+    parser.add_argument('--b_calibrate_mode', type=str,
+                        choices=['none', 'reset', 'offline', 'mixed'], default='none')
     parser.add_argument('--unbiased_var', type=str2bool, default=True)
 
     parser.add_argument('--use_rrc_on_wa', type=str2bool, default=False)
 
     parser.add_argument('--upper_bound_run', type=str2bool, default=False)
 
-    parser.add_argument('--initial_centroid', type=str, choices=['raw', 'hard'], default='raw')
-    parser.add_argument('--calibrate_cls_weights', type=str2bool, default=False)
+    parser.add_argument('--initial_centroid', type=str,
+                        choices=['raw', 'hard'], default='raw')
+    parser.add_argument('--calibrate_cls_weights',
+                        type=str2bool, default=False)
 
     parser.add_argument('--pl_eval_off_f', type=str2bool, default=False)
     parser.add_argument('--pl_eval_off_b', type=str2bool, default=False)
@@ -964,11 +1083,15 @@ if __name__ == "__main__":
 
     parser.add_argument('--pl_threshold', type=float, default=0)
 
-    parser.add_argument('--init_centroids_with_cls', type=str2bool, default=True)
+    parser.add_argument('--init_centroids_with_cls',
+                        type=str2bool, default=True)
 
-    parser.add_argument('--minent_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
-    parser.add_argument('--cr_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
-    parser.add_argument('--cls_scheduling', type=str, choices=['const', 'linear', 'step'], default='const')
+    parser.add_argument('--minent_scheduling', type=str,
+                        choices=['const', 'linear', 'step'], default='const')
+    parser.add_argument('--cr_scheduling', type=str,
+                        choices=['const', 'linear', 'step'], default='const')
+    parser.add_argument('--cls_scheduling', type=str,
+                        choices=['const', 'linear', 'step'], default='const')
 
     parser.add_argument('--cls_dis_weight', type=float, default=0.0)
     parser.add_argument('--cls_dis_c_update', type=str2bool, default=False)
@@ -983,6 +1106,9 @@ if __name__ == "__main__":
     parser.add_argument('--initial_memax', type=int, default=100)
     parser.add_argument('--wa_to_memax', type=str2bool, default=True)
     parser.add_argument('--memax_print_freq', type=int, default=10)
+
+    parser.add_argument('--mixup', type=str2bool, default=False)
+    parser.add_argument('--mixup_alpha', type=float, default=1.0)
 
     args = parser.parse_args()
 
@@ -1038,15 +1164,18 @@ if __name__ == "__main__":
             args.name = names[args.t]
             args.savename = names[args.t]
 
-            args.output_dir_src = osp.join(args.output_src, args.da, args.dset, 'source')
-            args.output_dir = osp.join(args.output, args.da, args.dset, args.name)
+            args.output_dir_src = osp.join(
+                args.output_src, args.da, args.dset, 'source')
+            args.output_dir = osp.join(
+                args.output, args.da, args.dset, args.name)
 
             if not osp.exists(args.output_dir):
                 os.system('mkdir -p ' + args.output_dir)
             if not osp.exists(args.output_dir):
                 os.mkdir(args.output_dir)
 
-            args.out_file = open(osp.join(args.output_dir, 'log_' + args.savename + '.txt'), 'w')
+            args.out_file = open(
+                osp.join(args.output_dir, 'log_' + args.savename + '.txt'), 'w')
             args.out_file.write(print_args(args) + '\n')
             args.out_file.flush()
 
@@ -1056,9 +1185,12 @@ if __name__ == "__main__":
             args.t = i
 
             folder = args.folder
-            args.s_dset_path = folder + args.dset + '/' + names[args.s] + '_list.txt'
-            args.t_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
-            args.test_dset_path = folder + args.dset + '/' + names[args.t] + '_list.txt'
+            args.s_dset_path = folder + args.dset + \
+                '/' + names[args.s] + '_list.txt'
+            args.t_dset_path = folder + args.dset + \
+                '/' + names[args.t] + '_list.txt'
+            args.test_dset_path = folder + args.dset + \
+                '/' + names[args.t] + '_list.txt'
 
             if args.dset == 'office-home':
                 if args.disable_aug_for_shape:
@@ -1076,7 +1208,8 @@ if __name__ == "__main__":
                     args.src_classes = [i for i in range(65)]
                     args.tar_classes = [i for i in range(25)]
 
-            args.output_dir_src = osp.join(args.output_src, args.da, args.dset, names[args.s][0].upper())
+            args.output_dir_src = osp.join(
+                args.output_src, args.da, args.dset, names[args.s][0].upper())
             args.output_dir = osp.join(args.output, args.da, args.dset,
                                        names[args.s][0].upper() + names[args.t][0].upper())
             args.name = names[args.s][0].upper() + names[args.t][0].upper()
@@ -1089,8 +1222,10 @@ if __name__ == "__main__":
             args.savename = 'par_' + str(args.cls_par)
             if args.da == 'pda':
                 args.gent = ''
-                args.savename = 'par_' + str(args.cls_par) + '_thr' + str(args.threshold)
-            args.out_file = open(osp.join(args.output_dir, 'log_' + args.savename + '.txt'), 'w')
+                args.savename = 'par_' + \
+                    str(args.cls_par) + '_thr' + str(args.threshold)
+            args.out_file = open(
+                osp.join(args.output_dir, 'log_' + args.savename + '.txt'), 'w')
             args.out_file.write(print_args(args) + '\n')
             args.out_file.flush()
 
