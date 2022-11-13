@@ -62,6 +62,17 @@ def lr_scheduler(args, optimizer, iter_num, max_iter, gamma=10, power=0.75):
     return optimizer
 
 
+def temp_scheduler(args, classifier, iter_num, max_iter):
+    start = args.angular_temp
+    end = args.angular_temp_end
+    if args.angular_temp_schedule == 'cosine':
+        temp = start + (end-start) * \
+            (1 - np.cos(iter_num * np.pi / max_iter)) / 2
+        classifier.temp = temp
+    else:
+        pass
+
+
 def mixup_data(x, y, alpha=1.0):
     '''Returns mixed inputs, pairs of targets, and lambda'''
     if alpha > 0:
@@ -508,7 +519,7 @@ def train_source(args):
         except:
             if inputs_source[0].size(0) == 1:
                 continue
-
+        temp_scheduler(args, netC, iter_num, max_iter)
         iter_num += 1
         lr_scheduler(args, optimizer, iter_num=iter_num, max_iter=max_iter)
 
@@ -838,6 +849,8 @@ if __name__ == "__main__":
                         choices=['feat', 'btn', 'cls'])
     parser.add_argument('--cr_threshold', type=float, default=1.0)
     parser.add_argument('--angular_temp', type=float, default=0.1)
+    parser.add_argument('--angular_temp_end', type=float, default=1.0)
+    parser.add_argument('--angular_temp_schedule', type=str, default='cosine')
     parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--ssl_before_btn', action='store_true')
     parser.add_argument('--no_norm_img', action='store_true')

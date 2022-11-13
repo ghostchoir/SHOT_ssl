@@ -44,7 +44,8 @@ class VGGBase(nn.Module):
         self.features = model_vgg.features
         self.classifier = nn.Sequential()
         for i in range(6):
-            self.classifier.add_module("classifier" + str(i), model_vgg.classifier[i])
+            self.classifier.add_module(
+                "classifier" + str(i), model_vgg.classifier[i])
         self.in_features = model_vgg.classifier[6].in_features
 
     def forward(self, x):
@@ -139,17 +140,21 @@ class feat_classifier(nn.Module):
     def __init__(self, class_num, bottleneck_dim=256, type="linear", bias=True, temp=0.1, args=None):
         super(feat_classifier, self).__init__()
         self.type = type
+        self.temp = temp
         if type == 'wn':
-            self.fc = weightNorm(nn.Linear(bottleneck_dim, class_num, bias=bias), name="weight")
+            self.fc = weightNorm(
+                nn.Linear(bottleneck_dim, class_num, bias=bias), name="weight")
             self.fc.apply(init_weights)
         elif type == 'angular':
             self.fc = nn.Linear(bottleneck_dim, class_num, bias=False)
             self.fc.apply(init_weights)
-            self.temp = temp
+            #self.temp = temp
         elif type == 'add_margin':
-            self.fc = AddMarginProduct(bottleneck_dim, class_num, args.metric_s, args.metric_m)
+            self.fc = AddMarginProduct(
+                bottleneck_dim, class_num, args.metric_s, args.metric_m)
         elif type == 'arc_margin':
-            self.fc = ArcMarginProduct(bottleneck_dim, class_num, args.metric_s, args.metric_m, args.easy_margin)
+            self.fc = ArcMarginProduct(
+                bottleneck_dim, class_num, args.metric_s, args.metric_m, args.easy_margin)
         elif type == 'sphere':
             self.fc = SphereProduct(bottleneck_dim, class_num, args.metric_m)
         else:
@@ -293,7 +298,8 @@ class ResCifarBase(nn.Module):
         super(ResCifarBase, self).__init__()
 
         # Following the Wide ResNet convention, we fix the very first convolution
-        self.conv1 = nn.Conv2d(channels, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(channels, 16, kernel_size=3,
+                               stride=1, padding=1, bias=False)
         self.inplanes = 16
         self.layer1 = self._make_layer(norm_layer, 16 * width)
         self.layer2 = self._make_layer(norm_layer, 32 * width, stride=2)
@@ -313,7 +319,8 @@ class ResCifarBase(nn.Module):
         downsample = None
         if stride != 1 or self.inplanes != planes:
             downsample = Downsample(self.inplanes, planes, stride)
-        layers = [BasicBlockCifar(self.inplanes, planes, norm_layer, stride, downsample)]
+        layers = [BasicBlockCifar(
+            self.inplanes, planes, norm_layer, stride, downsample)]
         self.inplanes = planes
         for i in range(self.N - 1):
             layers.append(BasicBlockCifar(self.inplanes, planes, norm_layer))
