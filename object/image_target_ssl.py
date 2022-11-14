@@ -763,7 +763,7 @@ def obtain_label(loader, netF, netH, netB, netC, args, mem_label, eval_off=False
         accuracy = torch.sum(torch.squeeze(predict).float(
         ) == all_label).item() / float(all_label.size()[0])
         pred_label = torch.squeeze(predict).numpy()
-    elif args.pl_type in ['kmeans', 'spherical_kmeans']:
+    elif args.pl_type in ['kmeans', 'spherical_kmeans', 'spherical_kmeans_old']:
         if args.init_centroids_with_cls:
             try:
                 weights = copy.deepcopy(
